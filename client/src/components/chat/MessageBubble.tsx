@@ -1,5 +1,6 @@
 import type { Message, SearchStatus } from "../../types";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
 import { SearchSources } from "./SearchSources";
 import type { Components } from "react-markdown";
@@ -196,7 +197,7 @@ export function MessageBubble({ message, canRegenerate = false, onRegenerate, se
             </div>
           ) : (
             <div className="min-w-0 text-on-surface text-[13px] font-body leading-[1.6] break-words" style={{ overflowWrap: "anywhere" }}>
-              <ReactMarkdown components={markdownComponents}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {message.content}
               </ReactMarkdown>
             </div>
