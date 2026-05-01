@@ -9,3 +9,10 @@ logs/
 .env
 server/.env
 *.log
+
+# Local project notes/plans. Keep out of the public repo.
+Project_Report.md
+IMPLEMENTATION_PLAN.md
+UX_API_FIX_PLAN.md
+design/DESIGN.md
+client/README.md
