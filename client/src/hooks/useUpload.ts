@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import * as api from "../api/client";
+import { putImage } from "../lib/imageStore";
 import type { Attachment } from "../types";
 
 export function useUpload() {
@@ -11,6 +12,19 @@ export function useUpload() {
     setError(null);
     try {
       const att = await api.uploadImage(file);
+      if (att.dataUrl) {
+        try {
+          await putImage({
+            id: att.id,
+            dataUrl: att.dataUrl,
+            mimeType: att.mimeType,
+            fileName: att.fileName,
+            createdAt: Date.now(),
+          });
+        } catch (cacheErr) {
+          console.warn("[image-cache] put failed:", cacheErr);
+        }
+      }
       return att;
     } catch (e: unknown) {
       const msg =

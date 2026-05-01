@@ -1,7 +1,36 @@
 import { useCallback } from "react";
 import { useApp } from "../context/AppContext";
 import * as api from "../api/client";
+import { getImages } from "../lib/imageStore";
 import type { Session } from "../types";
+
+async function hydrateSessionImages(session: Session): Promise<Session> {
+  const ids: string[] = [];
+  for (const msg of session.messages) {
+    for (const att of msg.attachments) {
+      if (!att.dataUrl) ids.push(att.id);
+    }
+  }
+  if (ids.length === 0) return session;
+  try {
+    const stored = await getImages(ids);
+    if (Object.keys(stored).length === 0) return session;
+    return {
+      ...session,
+      messages: session.messages.map((msg) => ({
+        ...msg,
+        attachments: msg.attachments.map((att) =>
+          att.dataUrl || !stored[att.id]
+            ? att
+            : { ...att, dataUrl: stored[att.id].dataUrl }
+        ),
+      })),
+    };
+  } catch (e) {
+    console.warn("[image-cache] hydrate failed:", e);
+    return session;
+  }
+}
 
 export function useSessions() {
   const { state, dispatch } = useApp();
@@ -15,7 +44,8 @@ export function useSessions() {
     async (id: string) => {
       try {
         const session = await api.fetchSession(id);
-        dispatch({ type: "SET_ACTIVE_SESSION", payload: session });
+        const hydrated = await hydrateSessionImages(session);
+        dispatch({ type: "SET_ACTIVE_SESSION", payload: hydrated });
       } catch (e: unknown) {
         console.error("Failed to load session:", e);
       }

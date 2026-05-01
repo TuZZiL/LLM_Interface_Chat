@@ -2,7 +2,32 @@ import { useCallback } from "react";
 import { v4 as uuid } from "uuid";
 import { useApp } from "../context/AppContext";
 import * as api from "../api/client";
+import { getImage } from "../lib/imageStore";
 import type { Attachment, ChatParams, Message } from "../types";
+
+async function collectHistoryImages(
+  messages: Message[]
+): Promise<Record<string, string[]>> {
+  const out: Record<string, string[]> = {};
+  for (const msg of messages) {
+    if (msg.attachments.length === 0) continue;
+    const urls: string[] = [];
+    for (const att of msg.attachments) {
+      if (att.dataUrl) {
+        urls.push(att.dataUrl);
+        continue;
+      }
+      try {
+        const cached = await getImage(att.id);
+        if (cached?.dataUrl) urls.push(cached.dataUrl);
+      } catch {
+        // skip
+      }
+    }
+    if (urls.length > 0) out[msg.id] = urls;
+  }
+  return out;
+}
 
 export function useChat() {
   const { state, dispatch } = useApp();
@@ -63,6 +88,11 @@ export function useChat() {
 
       dispatch({ type: "SET_CHAT_STATUS", payload: "streaming" });
 
+      // Collect images from prior turns so the model can see them again.
+      // Excludes the just-appended user/assistant placeholder (they have live dataUrls already).
+      const priorMessages = state.activeSession?.messages || [];
+      const historyImages = await collectHistoryImages(priorMessages);
+
       let resolved = false;
 
       await api.sendChatStream(
@@ -73,6 +103,7 @@ export function useChat() {
           messages: [{ role: "user", content: opts.text }],
           params: opts.params,
           attachments: sendableAttachments,
+          historyImages: Object.keys(historyImages).length > 0 ? historyImages : undefined,
           ...(isThinkingModel && state.thinkingEnabled
             ? {
                 thinking: { type: "enabled" },

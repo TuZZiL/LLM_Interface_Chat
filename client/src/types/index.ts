@@ -95,6 +95,7 @@ export interface ChatRequest {
   messages: { role: "user"; content: string }[];
   params?: ChatParams;
   attachments?: Attachment[];
+  historyImages?: Record<string, string[]>;
   thinking?: { type: "enabled" | "disabled" };
   reasoning_effort?: "high" | "max";
 }

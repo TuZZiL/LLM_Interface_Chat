@@ -62,7 +62,7 @@ async function resolveSystemPrompt(promptId) {
   return prompt.content;
 }
 
-function buildMessages(systemContent, session, textContent, attachments) {
+function buildMessages(systemContent, session, textContent, attachments, historyImages = null) {
   const messages = [];
 
   if (systemContent) {
@@ -71,7 +71,19 @@ function buildMessages(systemContent, session, textContent, attachments) {
 
   if (session) {
     for (const msg of session.messages) {
-      messages.push({ role: msg.role, content: msg.content });
+      const images = historyImages?.[msg.id];
+      if (images && images.length > 0) {
+        const parts = [];
+        for (const url of images) {
+          parts.push({ type: "image_url", image_url: { url } });
+        }
+        if (msg.content) {
+          parts.push({ type: "text", text: msg.content });
+        }
+        messages.push({ role: msg.role, content: parts });
+      } else {
+        messages.push({ role: msg.role, content: msg.content });
+      }
     }
   }
 
@@ -349,6 +361,7 @@ router.post("/", async (req, res, next) => {
       messages: userMessages = [],
       params = {},
       attachments = [],
+      historyImages = null,
     } = req.body;
 
     const { modelId, modelConfig } = resolveModel(requestedModel, attachments);
@@ -365,7 +378,7 @@ router.post("/", async (req, res, next) => {
     const textContent = userMessages[userMessages.length - 1]?.content || "";
     const webContext = await buildWebContext(textContent);
     const mimoMessages = addWebContext(
-      buildMessages(systemContent, session, textContent, attachments),
+      buildMessages(systemContent, session, textContent, attachments, historyImages),
       webContext.context
     );
 
@@ -409,6 +422,7 @@ router.post("/stream", async (req, res, next) => {
       messages: userMessages = [],
       params = {},
       attachments = [],
+      historyImages = null,
     } = req.body;
 
     const { modelId, modelConfig } = resolveModel(requestedModel, attachments);
@@ -423,7 +437,7 @@ router.post("/stream", async (req, res, next) => {
     }
 
     const textContent = userMessages[userMessages.length - 1]?.content || "";
-    const mimoMessages = buildMessages(systemContent, session, textContent, attachments);
+    const mimoMessages = buildMessages(systemContent, session, textContent, attachments, historyImages);
     const tools = getEnabledTools();
 
     // Set SSE headers

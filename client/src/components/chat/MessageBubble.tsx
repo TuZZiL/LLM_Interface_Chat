@@ -1,8 +1,10 @@
+import { useState } from "react";
 import type { Message, SearchStatus } from "../../types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
 import { SearchSources } from "./SearchSources";
+import { ImageLightbox } from "./ImageLightbox";
 import type { Components } from "react-markdown";
 
 interface Props {
@@ -104,6 +106,7 @@ export function MessageBubble({ message, canRegenerate = false, onRegenerate, se
   const isUser = message.role === "user";
   const isWaiting = message.status === "thinking" && !message.content;
   const isError = message.status === "error";
+  const [preview, setPreview] = useState<{ src: string; alt: string } | null>(null);
 
   if (isUser) {
     return (
@@ -116,17 +119,31 @@ export function MessageBubble({ message, canRegenerate = false, onRegenerate, se
             <div className="flex gap-1.5 mb-1.5 flex-wrap">
               {message.attachments.map((a) =>
                 a.dataUrl ? (
-                  <img
+                  <button
                     key={a.id}
-                    src={a.dataUrl}
-                    alt={a.fileName}
-                    className="w-16 h-16 object-cover rounded-lg border border-white/10"
-                  />
+                    type="button"
+                    onClick={() => setPreview({ src: a.dataUrl!, alt: a.fileName })}
+                    title={`${a.fileName} — click to enlarge`}
+                    className="group relative w-16 h-16 overflow-hidden rounded-lg border border-white/10 hover:border-cyan/40 transition-colors cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/50"
+                  >
+                    <img
+                      src={a.dataUrl}
+                      alt={a.fileName}
+                      loading="lazy"
+                      draggable={false}
+                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+                    <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-1">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-cyan drop-shadow">
+                        <path d="M21 21l-4.35-4.35M11 6v10M6 11h10M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
+                      </svg>
+                    </span>
+                  </button>
                 ) : (
                   <div
                     key={a.id}
                     className="max-w-36 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[10px] text-outline-variant"
-                    title={a.fileName}
+                    title={`${a.fileName} — image not in cache`}
                   >
                     <div className="truncate">{a.fileName}</div>
                     <div>{Math.ceil(a.size / 1024)} KB</div>
@@ -139,6 +156,9 @@ export function MessageBubble({ message, canRegenerate = false, onRegenerate, se
             {message.content}
           </p>
         </div>
+        {preview && (
+          <ImageLightbox src={preview.src} alt={preview.alt} onClose={() => setPreview(null)} />
+        )}
       </div>
     );
   }
