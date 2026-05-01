@@ -1,0 +1,29 @@
+{
+  "name": "llm-interface-chat",
+  "description": "Single-dyno React and Express chat interface for MiMo-compatible LLM APIs.",
+  "repository": "https://github.com/TuZZiL/LLM_Interface_Chat",
+  "stack": "heroku-24",
+  "env": {
+    "MIMO_API_KEY": {
+      "description": "MiMo API key.",
+      "required": true
+    },
+    "MIMO_BASE_URL": {
+      "description": "MiMo OpenAI-compatible API base URL.",
+      "value": "https://token-plan-sgp.xiaomimimo.com/v1"
+    },
+    "NODE_ENV": {
+      "description": "Node runtime mode.",
+      "value": "production"
+    }
+  },
+  "addons": [
+    "heroku-postgresql:essential-0"
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  }
+}

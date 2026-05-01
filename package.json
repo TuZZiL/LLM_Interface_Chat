@@ -1,0 +1,16 @@
+{
+  "name": "llm-interface-chat",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm run install:server && npm run install:client && npm run build --prefix client",
+    "heroku-postbuild": "npm run build",
+    "install:server": "npm ci --prefix server",
+    "install:client": "npm ci --prefix client",
+    "start": "npm start --prefix server"
+  },
+  "engines": {
+    "node": "24.x",
+    "npm": "11.x"
+  }
+}

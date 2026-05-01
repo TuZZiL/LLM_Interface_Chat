@@ -1,0 +1,52 @@
+# Project Report
+
+## 2026-05-01
+- done: Global Codex MCP `heroku` додано в `C:\Users\Admin\.codex\config.toml`.
+- context: Встановлено Heroku CLI `11.3.0` через npm global; MCP запускається як `heroku mcp:start`.
+- done: Global Codex MCP `octocode` видалено з config разом з його env secret.
+- context: Обрано Heroku hosting target: Basic dyno + Heroku Postgres Mini, з GitHub auto-deploy.
+- done: Підготовлено Heroku deploy: root `package.json`, `Procfile`, `app.json`, `.gitignore`.
+- done: Storage переведено на Postgres через `DATABASE_URL` з local JSON fallback; prompts окрема SQL table з `TEXT` content і single-default index; sessions зберігають `messages` як `jsonb`.
+- done: Express віддає `client/dist`; server startup чекає `initStorage()`.
+- done: Image attachments у persisted messages зберігаються без `dataUrl`; UI рендерить metadata fallback.
+- resolved: Heroku Postgres Mini тепер відповідає plan slug `heroku-postgresql:essential-0` ($5/month).
+- done: Local verify: root `npm run build` проходить; production smoke `/`, `/api/health`, session create/delete проходить.
+- next: Push у GitHub `TuZZiL/LLM_Interface_Chat`, створити Heroku app `llm-interface-chat` region `eu`, додати Postgres Essential 0, config vars, увімкнути GitHub auto-deploy з `main`.
+- next: Для реального доступу до Heroku виконати `heroku login`, потім restart Codex session.
+
+## 2026-04-30
+- context: Старт сесії. Є лише фронтенд-макет у `design/`: `code.html`, `DESIGN.md`, `screen.png`.
+- done: Проаналізовано макет і MiMo docs для OpenAI-compatible chat + image understanding.
+- done: Створено `IMPLEMENTATION_PLAN.md` з повним планом.
+- context: MiMo endpoint `https://token-plan-sgp.xiaomimimo.com/v1`, auth через `api-key`.
+- done: Побудовано backend: `server/` з Express, storage.js, mimoClient.js, routes (models, prompts, sessions, chat, uploads).
+- done: Smoke test backend — всі endpoints працюють, chat повертає реальну відповідь від MiMo.
+- done: Frontend scaffold: React 19 + Vite 6 + TypeScript + Tailwind CSS 4.
+- done: Frontend core: types, API client, context+reducer, hooks (sessions, prompts, chat, upload).
+- done: Frontend components: TopBar, Sidebar, Inspector, ChatArea, MessageBubble, Composer, PromptSelect, PromptModal, Toast.
+- done: Build проходить чисто (tsc + vite build).
+- done: Mobile drawer + responsive layout (Sidebar/Inspector hidden на мобільних).
+- done: Polish: react-markdown + react-syntax-highlighter для code blocks, копіювання коду.
+- done: Full stack test — session create → chat → response + usage зберігається.
+- next: Запуск в браузері (cd server && npm run dev) + (cd client && npm run dev) → http://localhost:5173.
+- done: Проінспектовано UX/API проблеми після першої реалізації; створено `UX_API_FIX_PLAN.md`.
+- context: Ключові gaps: немає SSE stream, user message не optimistic, image model не autoswitch через frontend `activeSession.model`, prompt editor замалий, header без API status/latency.
+- next: Реалізувати `UX_API_FIX_PLAN.md` у пріоритеті: shared chat state → image autoswitch → SSE streaming → header/UX polish.
+- done: Step 1 — Centralized chat state in context (chatStatus, lastLatencyMs, requestStartedAt, lastError).
+- done: Step 2 — Auto-switch model: frontend switches to mimo-v2.5 on image attach; backend auto-switches instead of error.
+- done: Step 3 — Optimistic user message + assistant placeholder (thinking dots).
+- done: Step 5 — Prompt editor: wide modal (920px), textarea 50-65vh.
+- done: Step 6 — Header: session title, model pill, ApiStatusBadge (health dot, status, latency).
+- done: Step 7 — Chat typography: 13px body, tighter padding, smaller headings.
+- done: Step 8 — Composer: focus-within border, items-center, icon send button.
+- done: Step 4 — SSE streaming: `chatCompletionStream` в mimoClient, `POST /api/chat/stream` endpoint, `sendChatStream` в API client, `APPEND_DELTA` action, useChat оновлено для streaming.
+- done: Streaming test — токени з'являються поступово, session зберігається після done, reasoning_content парситься.
+- context: Всі кроки з UX_API_FIX_PLAN.md реалізовано.
+- next: Step 4 — SSE streaming (backend stream endpoint + frontend fetch streaming).
+- resolved: Streaming UI issue — `APPEND_DELTA` додавав content, але MessageBubble ховав його за `thinking` dots до `done`; додано `streaming` status і рендер content після першого delta.
+- done: Smoke test `POST /api/chat/stream` без sessionId: backend віддає `contentDelta` до `done`; client build проходить.
+- resolved: Prompt switching issue — вибір prompt/model зберігався лише в React state; після stream `done` session зі storage повертала старий/default `systemPromptId`. Додано `PUT /api/sessions/:id`, client persistence і збереження `systemPromptId` під час chat save.
+- done: Prompt manager розширено: modal показує список prompts, редагує існуючі, створює нові, ставить prompt default для new chats, показує default badge. `EDIT` відкриває активний prompt session.
+- resolved: Prompt modal overflow — modal рендерився всередині right Inspector і через `backdrop-blur`/fixed context давав horizontal scroll; `Modal` переведено на React portal у `document.body`.
+- done: Chat error UX — provider high-risk/rejected errors показуються дружнім текстом, assistant error bubble має `Regenerate`; retry пере-використовує попередній user message без дубля в UI.
+- resolved: Markdown overflow — long inline styled text/code/link segments розпирали message bubble; додано `min-w-0`, `overflow-wrap:anywhere`, `break-words`, inline code wrapping і bounded code block scroll.
