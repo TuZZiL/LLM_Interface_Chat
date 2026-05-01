@@ -11,8 +11,12 @@
 - done: Image attachments у persisted messages зберігаються без `dataUrl`; UI рендерить metadata fallback.
 - resolved: Heroku Postgres Mini тепер відповідає plan slug `heroku-postgresql:essential-0` ($5/month).
 - done: Local verify: root `npm run build` проходить; production smoke `/`, `/api/health`, session create/delete проходить.
-- next: Push у GitHub `TuZZiL/LLM_Interface_Chat`, створити Heroku app `llm-interface-chat` region `eu`, додати Postgres Essential 0, config vars, увімкнути GitHub auto-deploy з `main`.
-- next: Для реального доступу до Heroku виконати `heroku login`, потім restart Codex session.
+- done: Git repo initialized, pushed `main` to `https://github.com/TuZZiL/LLM_Interface_Chat`.
+- done: Heroku app `llm-interface-chat` created in `eu`; deployed release `v5`; web dyno scaled to `1:Basic`.
+- done: Heroku Postgres `essential-0` provisioned; `/api/prompts` seeded default prompt; `pg:info` shows 2 tables.
+- done: Live verify passed: `/`, `/api/health`, session create/delete on Heroku.
+- blocked: GitHub auto-deploy still needs enabling in Heroku Dashboard (`Deploy` -> `GitHub` -> repo `TuZZiL/LLM_Interface_Chat` -> branch `main` -> Enable Automatic Deploys).
+- next: Після ввімкнення GitHub auto-deploy зробити test commit/push і перевірити Heroku auto release.
 
 ## 2026-04-30
 - context: Старт сесії. Є лише фронтенд-макет у `design/`: `code.html`, `DESIGN.md`, `screen.png`.
