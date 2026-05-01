@@ -18,6 +18,32 @@
 - blocked: GitHub auto-deploy still needs enabling in Heroku Dashboard (`Deploy` -> `GitHub` -> repo `TuZZiL/LLM_Interface_Chat` -> branch `main` -> Enable Automatic Deploys).
 - next: Після ввімкнення GitHub auto-deploy зробити test commit/push і перевірити Heroku auto release.
 
+### Heroku deploy runbook
+- context: GitHub repo `https://github.com/TuZZiL/LLM_Interface_Chat`, branch `main`.
+- context: Heroku app `llm-interface-chat`, region `eu`, live URL `https://llm-interface-chat-a56d6aea91fb.herokuapp.com/`.
+- context: Heroku git remote `https://git.heroku.com/llm-interface-chat.git`.
+- context: Runtime: one `web` dyno, size `Basic`, command from `Procfile`: `npm start`.
+- context: Database: Heroku Postgres `essential-0`, add-on `postgresql-regular-43257`, `DATABASE_URL` auto-managed by Heroku.
+- context: Storage model: `prompts` SQL table with `content TEXT` + single default index; `sessions` SQL table with `messages JSONB`; image `dataUrl` is not persisted.
+- context: Heroku config vars required: `MIMO_API_KEY` (secret, never commit), `MIMO_BASE_URL=https://token-plan-sgp.xiaomimimo.com/v1`, `NODE_ENV=production`.
+- context: App manifest `app.json` declares `heroku-24`, Postgres `heroku-postgresql:essential-0`, `web` formation `1:basic`, required env vars.
+- done: Initial manual deploy used `git push heroku main`; GitHub `main` is pushed and ready for auto-deploy.
+- blocked: Heroku GitHub auto-deploy must be enabled in Dashboard manually: `App -> Deploy -> GitHub -> Connect repo -> TuZZiL/LLM_Interface_Chat -> main -> Enable Automatic Deploys`.
+- verify: Local build command `npm run build`.
+- verify: Local production smoke `npm start`, then `http://localhost:3001/` and `http://localhost:3001/api/health`.
+- verify: Live health `Invoke-RestMethod https://llm-interface-chat-a56d6aea91fb.herokuapp.com/api/health`.
+- verify: Live frontend `(Invoke-WebRequest https://llm-interface-chat-a56d6aea91fb.herokuapp.com/ -UseBasicParsing).StatusCode`.
+- verify: Heroku dynos `heroku ps -a llm-interface-chat`.
+- verify: Heroku logs `heroku logs --num 80 -a llm-interface-chat`.
+- verify: Heroku Postgres `heroku pg:info -a llm-interface-chat`.
+- command: Set Heroku remote `heroku git:remote -a llm-interface-chat`.
+- command: Manual deploy fallback `git push heroku main`.
+- command: Scale Basic dyno `heroku ps:scale web=1:basic -a llm-interface-chat`.
+- command: Set config vars `heroku config:set MIMO_API_KEY=<secret> MIMO_BASE_URL=https://token-plan-sgp.xiaomimimo.com/v1 NODE_ENV=production -a llm-interface-chat`.
+- command: Check config var names `heroku config -a llm-interface-chat`.
+- command: Restart app `heroku ps:restart -a llm-interface-chat`.
+- command: Open app in browser `heroku open -a llm-interface-chat`.
+
 ## 2026-04-30
 - context: Старт сесії. Є лише фронтенд-макет у `design/`: `code.html`, `DESIGN.md`, `screen.png`.
 - done: Проаналізовано макет і MiMo docs для OpenAI-compatible chat + image understanding.
