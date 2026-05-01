@@ -4,20 +4,36 @@ export const PORT = process.env.PORT || 3001;
 export const MIMO_API_KEY = process.env.MIMO_API_KEY || "";
 export const MIMO_BASE_URL = process.env.MIMO_BASE_URL || "https://api.xiaomimimo.com/v1";
 
+export const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "";
+export const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
+
 export const MODELS = [
   {
     id: "mimo-v2.5-pro",
+    provider: "mimo",
     label: "MiMo-V2.5-Pro",
     supportsText: true,
     supportsImages: false,
+    supportsThinking: false,
     defaultFor: "text",
   },
   {
     id: "mimo-v2.5",
+    provider: "mimo",
     label: "MiMo-V2.5",
     supportsText: true,
     supportsImages: true,
+    supportsThinking: false,
     defaultFor: "image",
+  },
+  {
+    id: "deepseek-v4-flash",
+    provider: "deepseek",
+    label: "DeepSeek-V4-Flash",
+    supportsText: true,
+    supportsImages: false,
+    supportsThinking: true,
+    defaultFor: null,
   },
 ];
 
@@ -87,6 +103,10 @@ export function getEnabledTools() {
   return tools;
 }
 
+export function getModelById(modelId) {
+  return MODELS.find((m) => m.id === modelId) || null;
+}
+
 export const ERROR_CODES = {
   MISSING_API_KEY: "MISSING_API_KEY",
   INVALID_MODEL: "INVALID_MODEL",
@@ -96,4 +116,5 @@ export const ERROR_CODES = {
   INVALID_IMAGE_TYPE: "INVALID_IMAGE_TYPE",
   IMAGE_TOO_LARGE: "IMAGE_TOO_LARGE",
   MIMO_REQUEST_FAILED: "MIMO_REQUEST_FAILED",
+  DEEPSEEK_REQUEST_FAILED: "DEEPSEEK_REQUEST_FAILED",
 };

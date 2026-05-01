@@ -1,9 +1,11 @@
 export interface Model {
   id: string;
+  provider: "mimo" | "deepseek";
   label: string;
   supportsText: boolean;
   supportsImages: boolean;
-  defaultFor: "text" | "image";
+  supportsThinking: boolean;
+  defaultFor: "text" | "image" | null;
 }
 
 export interface Prompt {
@@ -56,6 +58,7 @@ export interface Message {
   createdAt: string;
   status?: MessageStatus;
   searchResults?: SearchResult[];
+  reasoningContent?: string | null;
 }
 
 export interface Session {
@@ -92,6 +95,8 @@ export interface ChatRequest {
   messages: { role: "user"; content: string }[];
   params?: ChatParams;
   attachments?: Attachment[];
+  thinking?: { type: "enabled" | "disabled" };
+  reasoning_effort?: "high" | "max";
 }
 
 export interface ChatResponse {

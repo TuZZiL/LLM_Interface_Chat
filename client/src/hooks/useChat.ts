@@ -58,6 +58,9 @@ export function useChat() {
         });
       }
 
+      const modelConfig = state.models.find((m) => m.id === effectiveModel);
+      const isThinkingModel = modelConfig?.supportsThinking ?? false;
+
       dispatch({ type: "SET_CHAT_STATUS", payload: "streaming" });
 
       let resolved = false;
@@ -70,6 +73,14 @@ export function useChat() {
           messages: [{ role: "user", content: opts.text }],
           params: opts.params,
           attachments: sendableAttachments,
+          ...(isThinkingModel && state.thinkingEnabled
+            ? {
+                thinking: { type: "enabled" },
+                reasoning_effort: state.reasoningEffort,
+              }
+            : isThinkingModel
+              ? { thinking: { type: "disabled" } }
+              : {}),
         },
         {
           onStart: (info) => {
@@ -102,6 +113,7 @@ export function useChat() {
                 usage: result.assistantMessage.usage,
                 status: "complete",
                 searchResults: result.assistantMessage.searchResults,
+                reasoningContent: result.assistantMessage.reasoningContent,
               },
             });
 
@@ -132,7 +144,7 @@ export function useChat() {
 
       return resolved;
     },
-    [state.activeSession, dispatch]
+    [state.activeSession, state.models, state.thinkingEnabled, state.reasoningEffort, dispatch]
   );
 
   const sendMessage = useCallback(

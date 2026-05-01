@@ -30,6 +30,8 @@ interface AppState {
   lastError: string | null;
   requestStartedAt: number | null;
   searchStatus: SearchStatus | null;
+  thinkingEnabled: boolean;
+  reasoningEffort: "high" | "max";
 }
 
 type Action =
@@ -45,6 +47,8 @@ type Action =
   | { type: "SET_LAST_ERROR"; payload: string | null }
   | { type: "SET_REQUEST_STARTED"; payload: number | null }
   | { type: "SET_SEARCH_STATUS"; payload: SearchStatus | null }
+  | { type: "SET_THINKING"; payload: boolean }
+  | { type: "SET_REASONING_EFFORT"; payload: "high" | "max" }
   | { type: "APPEND_MESSAGE"; payload: Message }
   | { type: "APPEND_DELTA"; payload: string }
   | { type: "UPDATE_LAST_MESSAGE"; payload: Partial<Message> }
@@ -63,6 +67,8 @@ const initialState: AppState = {
   lastError: null,
   requestStartedAt: null,
   searchStatus: null,
+  thinkingEnabled: true,
+  reasoningEffort: "high",
 };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -107,6 +113,10 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, requestStartedAt: action.payload };
     case "SET_SEARCH_STATUS":
       return { ...state, searchStatus: action.payload };
+    case "SET_THINKING":
+      return { ...state, thinkingEnabled: action.payload };
+    case "SET_REASONING_EFFORT":
+      return { ...state, reasoningEffort: action.payload };
     case "APPEND_MESSAGE":
       if (!state.activeSession) return state;
       return {

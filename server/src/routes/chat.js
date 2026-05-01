@@ -2,17 +2,21 @@ import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import {
   FIRECRAWL_ENABLED,
-  MODELS,
   ERROR_CODES,
   TAVILY_ENABLED,
   getEnabledTools,
+  getModelById,
 } from "../config.js";
 import { getSessionById, updateSession, getPromptById } from "../storage.js";
 import { chatCompletion, chatCompletionStream, AppError } from "../mimoClient.js";
+import {
+  chatCompletion as deepseekChat,
+  chatCompletionStream as deepseekStream,
+} from "../deepseekClient.js";
 import { tavilySearch } from "../tavilyClient.js";
 import { firecrawlScrape } from "../firecrawlClient.js";
 
-const MAX_TOOL_ITERATIONS = 3;
+const MAX_TOOL_ITERATIONS = 4;
 const MAX_WEB_RESULTS = 5;
 const MAX_SCRAPE_URLS = 2;
 const WEB_INTENT_RE =
@@ -26,17 +30,17 @@ const router = Router();
 function resolveModel(requestedModel, attachments) {
   const imageAttachments = attachments.filter((attachment) => attachment.dataUrl);
   let modelId = requestedModel || (imageAttachments.length > 0 ? "mimo-v2.5" : "mimo-v2.5-pro");
-  let modelConfig = MODELS.find((m) => m.id === modelId);
+  let modelConfig = getModelById(modelId);
 
   if (!modelConfig) {
     throw new AppError(ERROR_CODES.INVALID_MODEL, `Unknown model: ${modelId}`, 400);
   }
 
   if (imageAttachments.length > 0 && !modelConfig.supportsImages) {
-    const imageModel = MODELS.find((m) => m.supportsImages);
-    if (imageModel) {
-      modelId = imageModel.id;
-      modelConfig = imageModel;
+    const fallback = getModelById("mimo-v2.5");
+    if (fallback) {
+      modelId = fallback.id;
+      modelConfig = fallback;
     } else {
       throw new AppError(
         ERROR_CODES.MODEL_DOES_NOT_SUPPORT_IMAGES,
@@ -58,7 +62,7 @@ async function resolveSystemPrompt(promptId) {
   return prompt.content;
 }
 
-function buildMimoMessages(systemContent, session, textContent, attachments) {
+function buildMessages(systemContent, session, textContent, attachments) {
   const messages = [];
 
   if (systemContent) {
@@ -96,6 +100,29 @@ function addWebContext(messages, context) {
   if (!hasSystem) return [contextMessage, ...messages];
 
   return [messages[0], contextMessage, ...messages.slice(1)];
+}
+
+function buildApiParams(requestParams, modelConfig) {
+  if (modelConfig.supportsThinking && requestParams.thinking) {
+    const { thinking, reasoning_effort, ...rest } = requestParams;
+    const params = { thinking };
+    if (reasoning_effort) params.reasoning_effort = reasoning_effort;
+    for (const [k, v] of Object.entries(rest)) {
+      if (v !== undefined) params[k] = v;
+    }
+    return params;
+  }
+  return { ...requestParams };
+}
+
+function callChat(modelConfig, args) {
+  if (modelConfig.provider === "deepseek") return deepseekChat(args);
+  return chatCompletion(args);
+}
+
+function callStream(modelConfig, args) {
+  if (modelConfig.provider === "deepseek") return deepseekStream(args);
+  return chatCompletionStream(args);
 }
 
 function getUrls(text) {
@@ -180,7 +207,8 @@ async function saveMessages(
   modelId,
   requestedModel,
   systemPromptId,
-  searchResults = null
+  searchResults = null,
+  reasoningContent = null
 ) {
   const userMessage = {
     id: uuid(),
@@ -201,6 +229,10 @@ async function saveMessages(
     error: null,
     createdAt: new Date().toISOString(),
   };
+
+  if (reasoningContent) {
+    assistantMessage.reasoningContent = reasoningContent;
+  }
 
   if (searchResults && searchResults.length > 0) {
     assistantMessage.searchResults = searchResults;
@@ -319,7 +351,7 @@ router.post("/", async (req, res, next) => {
       attachments = [],
     } = req.body;
 
-    const { modelId } = resolveModel(requestedModel, attachments);
+    const { modelId, modelConfig } = resolveModel(requestedModel, attachments);
     const systemContent = await resolveSystemPrompt(systemPromptId);
 
     let session = null;
@@ -333,12 +365,14 @@ router.post("/", async (req, res, next) => {
     const textContent = userMessages[userMessages.length - 1]?.content || "";
     const webContext = await buildWebContext(textContent);
     const mimoMessages = addWebContext(
-      buildMimoMessages(systemContent, session, textContent, attachments),
+      buildMessages(systemContent, session, textContent, attachments),
       webContext.context
     );
 
-    const apiResponse = await chatCompletion({ model: modelId, messages: mimoMessages, params });
+    const apiParams = buildApiParams(params, modelConfig);
+    const apiResponse = await callChat(modelConfig, { model: modelId, messages: mimoMessages, params: apiParams });
     const assistantText = apiResponse.choices?.[0]?.message?.content || "";
+    const reasoningText = apiResponse.choices?.[0]?.message?.reasoning_content || null;
     const usage = apiResponse.usage || null;
 
     const { assistantMessage } = await saveMessages(
@@ -351,7 +385,8 @@ router.post("/", async (req, res, next) => {
       modelId,
       requestedModel,
       systemPromptId,
-      webContext.sources
+      webContext.sources,
+      reasoningText
     );
 
     res.json({ message: assistantMessage, session: session ? await getSessionById(sessionId) : null, modelUsed: modelId });
@@ -376,7 +411,7 @@ router.post("/stream", async (req, res, next) => {
       attachments = [],
     } = req.body;
 
-    const { modelId } = resolveModel(requestedModel, attachments);
+    const { modelId, modelConfig } = resolveModel(requestedModel, attachments);
     const systemContent = await resolveSystemPrompt(systemPromptId);
 
     let session = null;
@@ -388,7 +423,7 @@ router.post("/stream", async (req, res, next) => {
     }
 
     const textContent = userMessages[userMessages.length - 1]?.content || "";
-    const mimoMessages = buildMimoMessages(systemContent, session, textContent, attachments);
+    const mimoMessages = buildMessages(systemContent, session, textContent, attachments);
     const tools = getEnabledTools();
 
     // Set SSE headers
@@ -402,6 +437,7 @@ router.post("/stream", async (req, res, next) => {
     res.write(`event: start\ndata: ${JSON.stringify({ requestId, modelUsed: modelId })}\n\n`);
 
     let accumulated = "";
+    let accumulatedReasoning = "";
     let usage = null;
     const allSearchResults = [];
 
@@ -411,14 +447,21 @@ router.post("/stream", async (req, res, next) => {
     allSearchResults.push(...webContext.sources);
 
     let currentMessages = addWebContext(mimoMessages, webContext.context);
+    const apiParams = buildApiParams(params, modelConfig);
+    let lastFinishReason = null;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      const stream = await chatCompletionStream({
+      const isFinalIteration = iteration === MAX_TOOL_ITERATIONS - 1;
+      const streamParams = (tools.length > 0 && !isFinalIteration)
+        ? { ...apiParams, tools }
+        : apiParams;
+      const stream = await callStream(modelConfig, {
         model: modelId,
         messages: currentMessages,
-        params: tools.length > 0 ? { ...params, tools } : params,
+        params: streamParams,
       });
 
+      let turnReasoning = "";
       let hasToolCalls = false;
       const toolCallAccumulators = {};
 
@@ -434,6 +477,8 @@ router.post("/stream", async (req, res, next) => {
           }
 
           if (event.reasoningContent) {
+            turnReasoning += event.reasoningContent;
+            accumulatedReasoning += event.reasoningContent;
             res.write(`event: delta\ndata: ${JSON.stringify({ reasoningDelta: event.reasoningContent })}\n\n`);
           }
 
@@ -458,10 +503,20 @@ router.post("/stream", async (req, res, next) => {
           if (event.usage) {
             usage = event.usage;
           }
+
+          if (event.finishReason) {
+            lastFinishReason = event.finishReason;
+          }
         }
       }
 
       if (!hasToolCalls) {
+        break;
+      }
+
+      if (isFinalIteration) {
+        // Tools were not offered on this iteration; ignore any phantom tool_calls.
+        console.warn(`[chat-stream] model emitted tool_calls on final iteration; ignoring`);
         break;
       }
 
@@ -470,6 +525,9 @@ router.post("/stream", async (req, res, next) => {
 
       // Build assistant message with tool_calls for context
       const assistantToolMsg = { role: "assistant", tool_calls: toolCallsArray, content: null };
+      if (turnReasoning && modelConfig.supportsThinking) {
+        assistantToolMsg.reasoning_content = turnReasoning;
+      }
       currentMessages.push(assistantToolMsg);
 
       for (const tc of toolCallsArray) {
@@ -509,6 +567,30 @@ router.post("/stream", async (req, res, next) => {
       }
     }
 
+    // Empty-response handling: surface a friendly error instead of saving a blank message.
+    if (!accumulated.trim()) {
+      let errorMessage;
+      let errorCode;
+      if (lastFinishReason === "content_filter") {
+        errorCode = "CONTENT_FILTERED";
+        errorMessage = "Provider blocked this response due to content policy. Try rephrasing.";
+      } else if (allSearchResults.length > 0) {
+        errorCode = "EMPTY_AFTER_SEARCH";
+        errorMessage = "Model didn't produce a response after searching. Try rephrasing or regenerate.";
+      } else {
+        errorCode = "EMPTY_RESPONSE";
+        errorMessage = "Model returned an empty response. Try again or rephrase.";
+      }
+      console.warn(`[chat-stream] empty response (finish=${lastFinishReason}, sources=${allSearchResults.length})`);
+      res.write(`event: error\ndata: ${JSON.stringify({
+        code: errorCode,
+        message: errorMessage,
+        status: 502,
+      })}\n\n`);
+      res.end();
+      return;
+    }
+
     // Save and finish
     const latencyMs = Date.now() - startTime;
     const { assistantMessage } = await saveMessages(
@@ -521,7 +603,8 @@ router.post("/stream", async (req, res, next) => {
       modelId,
       requestedModel,
       systemPromptId,
-      allSearchResults
+      allSearchResults,
+      accumulatedReasoning || null
     );
 
     const sessionData = session ? await getSessionById(sessionId) : null;

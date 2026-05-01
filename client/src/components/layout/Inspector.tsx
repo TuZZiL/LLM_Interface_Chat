@@ -25,6 +25,10 @@ export function InspectorContent() {
     (p) => p.id === activeSession.systemPromptId
   );
 
+  const activeModelConfig = state.models.find((m) => m.id === activeSession.model);
+  const supportsThinking = activeModelConfig?.supportsThinking ?? false;
+  const thinkingActive = supportsThinking && state.thinkingEnabled;
+
   const handleModelChange = (modelId: string) => {
     updateActiveSession({ ...activeSession, model: modelId });
   };
@@ -38,9 +42,11 @@ export function InspectorContent() {
           prompt: acc.prompt + u.prompt_tokens,
           completion: acc.completion + u.completion_tokens,
           total: acc.total + u.total_tokens,
+          reasoning:
+            acc.reasoning + (u.completion_tokens_details?.reasoning_tokens ?? 0),
         };
       },
-      { prompt: 0, completion: 0, total: 0 }
+      { prompt: 0, completion: 0, total: 0, reasoning: 0 }
     );
 
   return (
@@ -64,12 +70,69 @@ export function InspectorContent() {
               >
                 <div className="font-medium">{m.label}</div>
                 <div className="text-outline text-[10px] mt-0.5">
-                  {m.supportsImages ? "Text + Image" : "Text only"}
+                  {m.supportsImages
+                    ? "Text + Image"
+                    : m.supportsThinking
+                      ? "Text + Thinking"
+                      : "Text only"}
                 </div>
               </button>
             ))}
           </div>
         </section>
+
+        {/* Thinking Mode (only for thinking-capable models) */}
+        {supportsThinking && (
+          <section>
+            <div className="text-cyan text-label font-mono uppercase mb-3 border-l-2 border-cyan pl-2">
+              Thinking
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-on-surface-variant">Thinking Mode</span>
+                <button
+                  onClick={() =>
+                    dispatch({ type: "SET_THINKING", payload: !state.thinkingEnabled })
+                  }
+                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                    state.thinkingEnabled ? "bg-cyan" : "bg-white/10"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                      state.thinkingEnabled ? "left-[22px]" : "left-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {state.thinkingEnabled && (
+                <div>
+                  <div className="text-[10px] uppercase text-outline mb-2">
+                    Reasoning Effort
+                  </div>
+                  <div className="flex gap-1">
+                    {(["high", "max"] as const).map((level) => (
+                      <button
+                        key={level}
+                        onClick={() =>
+                          dispatch({ type: "SET_REASONING_EFFORT", payload: level })
+                        }
+                        className={`flex-1 px-2 py-1.5 rounded text-[10px] font-mono uppercase transition-colors ${
+                          state.reasoningEffort === level
+                            ? "bg-cyan/15 text-cyan border border-cyan/30"
+                            : "text-outline hover:bg-white/5 border border-transparent"
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Prompt Select */}
         <section>
@@ -95,8 +158,13 @@ export function InspectorContent() {
           <div className="text-cyan text-label font-mono uppercase mb-3 border-l-2 border-cyan pl-2">
             Parameters
           </div>
+          {thinkingActive && (
+            <div className="mb-3 px-2 py-1.5 rounded bg-cyan/5 border border-cyan/10 text-[10px] text-cyan/70">
+              Temperature and Top P are ignored in thinking mode
+            </div>
+          )}
           <div className="space-y-4">
-            <div>
+            <div className={thinkingActive ? "opacity-40 pointer-events-none" : ""}>
               <div className="flex justify-between text-[10px] uppercase text-outline mb-1">
                 <span>Temperature</span>
                 <span className="text-on-surface font-mono">
@@ -122,7 +190,7 @@ export function InspectorContent() {
                 <span>Creative</span>
               </div>
             </div>
-            <div>
+            <div className={thinkingActive ? "opacity-40 pointer-events-none" : ""}>
               <div className="flex justify-between text-[10px] uppercase text-outline mb-1">
                 <span>Top P</span>
                 <span className="text-on-surface font-mono">
@@ -198,6 +266,14 @@ export function InspectorContent() {
                   {usage.completion.toLocaleString()}
                 </span>
               </div>
+              {usage.reasoning > 0 && (
+                <div className="flex justify-between text-on-surface-variant pl-3">
+                  <span className="text-cyan/60">Reasoning</span>
+                  <span className="text-cyan/60 font-mono">
+                    {usage.reasoning.toLocaleString()}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-on-surface-variant border-t border-white/5 pt-2">
                 <span>Total</span>
                 <span className="text-cyan font-mono font-bold">

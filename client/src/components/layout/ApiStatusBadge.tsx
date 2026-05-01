@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { useApp } from "../../context/AppContext";
 
+interface ProviderHealth {
+  apiKeyConfigured: boolean;
+  baseUrl: string;
+}
+
 interface HealthData {
   ok: boolean;
-  apiKeyConfigured: boolean;
-  providerBaseUrl: string;
+  providers: {
+    mimo: ProviderHealth;
+    deepseek: ProviderHealth;
+  };
 }
 
 export function ApiStatusBadge() {
@@ -18,10 +25,18 @@ export function ApiStatusBadge() {
       .catch(() => setHealth(null));
   }, []);
 
+  const activeModel = state.activeSession?.model;
+  const activeModelConfig = state.models.find((m) => m.id === activeModel);
+  const provider = activeModelConfig?.provider || "mimo";
+
+  const providerOk = health
+    ? health.providers?.[provider]?.apiKeyConfigured ?? false
+    : false;
+
   const status = !health
     ? { label: "Checking...", color: "bg-outline" }
-    : !health.apiKeyConfigured
-      ? { label: "No API key", color: "bg-error" }
+    : !providerOk
+      ? { label: `No ${provider} key`, color: "bg-error" }
       : state.chatStatus === "sending" || state.chatStatus === "streaming"
         ? { label: "Active", color: "bg-cyan animate-pulse" }
         : state.chatStatus === "error"
