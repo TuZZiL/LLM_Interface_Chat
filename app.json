@@ -15,6 +15,24 @@
     "NODE_ENV": {
       "description": "Node runtime mode.",
       "value": "production"
+    },
+    "TAVILY_API_KEY": {
+      "description": "Optional Tavily API key for current web search.",
+      "required": false
+    },
+    "TAVILY_ENABLED": {
+      "description": "Enable Tavily web search when TAVILY_API_KEY is configured.",
+      "value": "true",
+      "required": false
+    },
+    "FIRECRAWL_API_KEY": {
+      "description": "Optional Firecrawl API key for URL scraping.",
+      "required": false
+    },
+    "FIRECRAWL_ENABLED": {
+      "description": "Enable Firecrawl scraping when FIRECRAWL_API_KEY is configured.",
+      "value": "true",
+      "required": false
     }
   },
   "addons": [

@@ -30,10 +30,23 @@ export const DEFAULT_PARAMS = {
 };
 
 export const TAVILY_API_KEY = process.env.TAVILY_API_KEY || "";
-export const TAVILY_ENABLED = process.env.TAVILY_ENABLED === "true" && !!TAVILY_API_KEY;
+const truthyValues = new Set(["true", "1", "yes", "on"]);
+const falseyValues = new Set(["false", "0", "no", "off"]);
+
+function readEnabledFlag(name, hasKey) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return hasKey;
+
+  const normalized = raw.trim().toLowerCase();
+  if (truthyValues.has(normalized)) return hasKey;
+  if (falseyValues.has(normalized)) return false;
+  return hasKey;
+}
+
+export const TAVILY_ENABLED = readEnabledFlag("TAVILY_ENABLED", !!TAVILY_API_KEY);
 
 export const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || "";
-export const FIRECRAWL_ENABLED = process.env.FIRECRAWL_ENABLED === "true" && !!FIRECRAWL_API_KEY;
+export const FIRECRAWL_ENABLED = readEnabledFlag("FIRECRAWL_ENABLED", !!FIRECRAWL_API_KEY);
 
 export const WEB_SEARCH_TOOL = {
   type: "function",

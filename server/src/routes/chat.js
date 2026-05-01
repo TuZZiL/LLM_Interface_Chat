@@ -1,12 +1,23 @@
 import { Router } from "express";
 import { v4 as uuid } from "uuid";
-import { MODELS, ERROR_CODES, getEnabledTools } from "../config.js";
+import {
+  FIRECRAWL_ENABLED,
+  MODELS,
+  ERROR_CODES,
+  TAVILY_ENABLED,
+  getEnabledTools,
+} from "../config.js";
 import { getSessionById, updateSession, getPromptById } from "../storage.js";
 import { chatCompletion, chatCompletionStream, AppError } from "../mimoClient.js";
 import { tavilySearch } from "../tavilyClient.js";
 import { firecrawlScrape } from "../firecrawlClient.js";
 
 const MAX_TOOL_ITERATIONS = 3;
+const MAX_WEB_RESULTS = 5;
+const MAX_SCRAPE_URLS = 2;
+const WEB_INTENT_RE =
+  /\b(today|current|latest|recent|now|news|price|rate|exchange|weather)\b|курс|гривн|долар|євро|евро|рубл|сьогодні|сегодня|зараз|сейчас|актуальн|поточн|текущ|останні|последн|новини|новости|ціна|цена/i;
+const URL_RE = /https?:\/\/[^\s)]+/gi;
 
 const router = Router();
 
@@ -75,6 +86,88 @@ function buildMimoMessages(systemContent, session, textContent, attachments) {
 
   messages.push({ role: "user", content: userContent });
   return messages;
+}
+
+function addWebContext(messages, context) {
+  if (!context) return messages;
+
+  const contextMessage = { role: "system", content: context };
+  const hasSystem = messages[0]?.role === "system";
+  if (!hasSystem) return [contextMessage, ...messages];
+
+  return [messages[0], contextMessage, ...messages.slice(1)];
+}
+
+function getUrls(text) {
+  return [...(text.match(URL_RE) || [])]
+    .map((url) => url.replace(/[.,;!?]+$/, ""))
+    .filter((url, index, urls) => urls.indexOf(url) === index)
+    .slice(0, MAX_SCRAPE_URLS);
+}
+
+function shouldSearchWeb(text) {
+  return TAVILY_ENABLED && WEB_INTENT_RE.test(text);
+}
+
+function formatSearchContext(results) {
+  return results
+    .map((result, index) => {
+      const title = result.title || "Untitled";
+      const url = result.url || "";
+      const content = result.content || "";
+      return `[${index + 1}] ${title}\nURL: ${url}\n${content}`;
+    })
+    .join("\n\n");
+}
+
+async function buildWebContext(textContent, notify = null) {
+  const contextParts = [];
+  const sources = [];
+  const urls = getUrls(textContent);
+
+  if (FIRECRAWL_ENABLED && urls.length > 0) {
+    for (const url of urls) {
+      notify?.({ status: "scraping", url });
+      try {
+        const scraped = await firecrawlScrape(url);
+        const title = scraped.metadata?.title || url;
+        const content = scraped.markdown.slice(0, 6000);
+        contextParts.push(`Scraped page: ${title}\nURL: ${url}\n${content}`);
+        sources.push({
+          title,
+          url,
+          content: scraped.metadata?.description || content.slice(0, 300),
+        });
+      } catch (err) {
+        contextParts.push(`Scrape failed for ${url}: ${err.message}`);
+      }
+    }
+  }
+
+  if (shouldSearchWeb(textContent)) {
+    notify?.({ status: "searching", query: textContent });
+    try {
+      const search = await tavilySearch(textContent, { max_results: MAX_WEB_RESULTS });
+      if (search.results.length > 0) {
+        contextParts.push(`Web search results for: ${textContent}\n${formatSearchContext(search.results)}`);
+        sources.push(...search.results);
+      }
+    } catch (err) {
+      contextParts.push(`Web search failed: ${err.message}`);
+    }
+  }
+
+  if (contextParts.length === 0) {
+    return { context: null, sources };
+  }
+
+  return {
+    context:
+      `Current web context was fetched by the server at ${new Date().toISOString()}.\n` +
+      "Use it to answer the user. Cite source URLs when relevant. Do not say you lack internet access if this context answers the question.\n\n" +
+      contextParts.join("\n\n---\n\n"),
+    sources,
+  };
 }
 
 async function saveMessages(
@@ -238,7 +331,11 @@ router.post("/", async (req, res, next) => {
     }
 
     const textContent = userMessages[userMessages.length - 1]?.content || "";
-    const mimoMessages = buildMimoMessages(systemContent, session, textContent, attachments);
+    const webContext = await buildWebContext(textContent);
+    const mimoMessages = addWebContext(
+      buildMimoMessages(systemContent, session, textContent, attachments),
+      webContext.context
+    );
 
     const apiResponse = await chatCompletion({ model: modelId, messages: mimoMessages, params });
     const assistantText = apiResponse.choices?.[0]?.message?.content || "";
@@ -253,7 +350,8 @@ router.post("/", async (req, res, next) => {
       usage,
       modelId,
       requestedModel,
-      systemPromptId
+      systemPromptId,
+      webContext.sources
     );
 
     res.json({ message: assistantMessage, session: session ? await getSessionById(sessionId) : null, modelUsed: modelId });
@@ -306,7 +404,13 @@ router.post("/stream", async (req, res, next) => {
     let accumulated = "";
     let usage = null;
     const allSearchResults = [];
-    let currentMessages = [...mimoMessages];
+
+    const webContext = await buildWebContext(textContent, (status) => {
+      res.write(`event: searchStatus\ndata: ${JSON.stringify(status)}\n\n`);
+    });
+    allSearchResults.push(...webContext.sources);
+
+    let currentMessages = addWebContext(mimoMessages, webContext.context);
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const stream = await chatCompletionStream({
