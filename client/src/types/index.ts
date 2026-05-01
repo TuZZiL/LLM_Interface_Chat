@@ -31,6 +31,19 @@ export interface Usage {
   prompt_tokens_details?: { cached_tokens?: number; image_tokens?: number };
 }
 
+export interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+  score?: number;
+}
+
+export interface SearchStatus {
+  status: "searching" | "scraping";
+  query?: string;
+  url?: string;
+}
+
 export type MessageStatus = "complete" | "thinking" | "streaming" | "error";
 
 export interface Message {
@@ -42,6 +55,7 @@ export interface Message {
   error: string | null;
   createdAt: string;
   status?: MessageStatus;
+  searchResults?: SearchResult[];
 }
 
 export interface Session {

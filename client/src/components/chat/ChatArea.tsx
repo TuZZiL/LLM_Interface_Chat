@@ -26,6 +26,7 @@ export function ChatArea() {
             message={m}
             onRegenerate={regenerateMessage}
             canRegenerate={!isStreaming}
+            searchStatus={m.status === "thinking" ? state.searchStatus : null}
           />
         ))}
         <div ref={endRef} />

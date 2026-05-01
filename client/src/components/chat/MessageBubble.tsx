@@ -1,12 +1,14 @@
-import type { Message } from "../../types";
+import type { Message, SearchStatus } from "../../types";
 import ReactMarkdown from "react-markdown";
 import { CodeBlock } from "./CodeBlock";
+import { SearchSources } from "./SearchSources";
 import type { Components } from "react-markdown";
 
 interface Props {
   message: Message;
   canRegenerate?: boolean;
   onRegenerate?: (messageId: string) => void;
+  searchStatus?: SearchStatus | null;
 }
 
 const markdownComponents: Components = {
@@ -97,7 +99,7 @@ function formatError(message: string | null) {
   return text;
 }
 
-export function MessageBubble({ message, canRegenerate = false, onRegenerate }: Props) {
+export function MessageBubble({ message, canRegenerate = false, onRegenerate, searchStatus }: Props) {
   const isUser = message.role === "user";
   const isWaiting = message.status === "thinking" && !message.content;
   const isError = message.status === "error";
@@ -157,17 +159,28 @@ export function MessageBubble({ message, canRegenerate = false, onRegenerate }: 
           }`}
         >
           {isWaiting ? (
-            <div className="flex gap-1">
-              <div className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse" />
-              <div
-                className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse"
-                style={{ animationDelay: "0.2s" }}
-              />
-              <div
-                className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse"
-                style={{ animationDelay: "0.4s" }}
-              />
-            </div>
+            searchStatus ? (
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse" />
+                <span className="text-[11px] text-outline-variant">
+                  {searchStatus.status === "searching"
+                    ? `Searching: ${searchStatus.query}...`
+                    : `Reading: ${searchStatus.url}...`}
+                </span>
+              </div>
+            ) : (
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse" />
+                <div
+                  className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse"
+                  style={{ animationDelay: "0.2s" }}
+                />
+                <div
+                  className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse"
+                  style={{ animationDelay: "0.4s" }}
+                />
+              </div>
+            )
           ) : isError ? (
             <div className="space-y-3">
               <p className="text-error text-[13px]">{formatError(message.error)}</p>
@@ -187,6 +200,9 @@ export function MessageBubble({ message, canRegenerate = false, onRegenerate }: 
                 {message.content}
               </ReactMarkdown>
             </div>
+          )}
+          {message.searchResults && message.searchResults.length > 0 && (
+            <SearchSources results={message.searchResults} />
           )}
           {message.usage && (
             <div className="mt-2.5 pt-2.5 border-t border-white/5 flex gap-3 text-[10px] text-outline font-mono">

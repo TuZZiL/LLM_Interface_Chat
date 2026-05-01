@@ -29,6 +29,51 @@ export const DEFAULT_PARAMS = {
   top_p: 0.95,
 };
 
+export const TAVILY_API_KEY = process.env.TAVILY_API_KEY || "";
+export const TAVILY_ENABLED = process.env.TAVILY_ENABLED === "true" && !!TAVILY_API_KEY;
+
+export const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || "";
+export const FIRECRAWL_ENABLED = process.env.FIRECRAWL_ENABLED === "true" && !!FIRECRAWL_API_KEY;
+
+export const WEB_SEARCH_TOOL = {
+  type: "function",
+  function: {
+    name: "web_search",
+    description:
+      "Search the web for current information. Use when the user asks about recent events, facts you are unsure about, or needs up-to-date data.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "The search query to find relevant information" },
+      },
+      required: ["query"],
+    },
+  },
+};
+
+export const SCRAPE_URL_TOOL = {
+  type: "function",
+  function: {
+    name: "scrape_url",
+    description:
+      "Extract the content of a web page as markdown. Use when the user shares a URL and wants you to read or analyze its content.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The full URL to scrape" },
+      },
+      required: ["url"],
+    },
+  },
+};
+
+export function getEnabledTools() {
+  const tools = [];
+  if (TAVILY_ENABLED) tools.push(WEB_SEARCH_TOOL);
+  if (FIRECRAWL_ENABLED) tools.push(SCRAPE_URL_TOOL);
+  return tools;
+}
+
 export const ERROR_CODES = {
   MISSING_API_KEY: "MISSING_API_KEY",
   INVALID_MODEL: "INVALID_MODEL",

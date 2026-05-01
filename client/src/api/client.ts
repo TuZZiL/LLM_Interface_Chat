@@ -7,6 +7,8 @@ import type {
   ChatResponse,
   Attachment,
   Message,
+  SearchResult,
+  SearchStatus,
 } from "../types";
 
 const BASE = "/api";
@@ -103,6 +105,8 @@ export function sendChat(data: ChatRequest): Promise<ChatResponse> {
 export interface StreamCallbacks {
   onStart?: (info: { modelUsed: string }) => void;
   onDelta: (contentDelta: string, reasoningDelta?: string) => void;
+  onSearchStatus?: (status: SearchStatus) => void;
+  onSources?: (results: SearchResult[], query?: string) => void;
   onDone: (result: {
     assistantMessage: Message;
     session: Session | null;
@@ -191,6 +195,20 @@ export async function sendChatStream(
             try {
               const parsed = JSON.parse(dataStr);
               callbacks.onError(parsed);
+            } catch {
+              // skip
+            }
+          } else if (currentEvent === "searchStatus") {
+            try {
+              const parsed = JSON.parse(dataStr);
+              callbacks.onSearchStatus?.(parsed);
+            } catch {
+              // skip
+            }
+          } else if (currentEvent === "sources") {
+            try {
+              const parsed = JSON.parse(dataStr);
+              callbacks.onSources?.(parsed.results, parsed.query);
             } catch {
               // skip
             }

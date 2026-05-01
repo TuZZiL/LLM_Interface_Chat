@@ -80,10 +80,19 @@ export function useChat() {
             dispatch({ type: "APPEND_DELTA", payload: contentDelta });
           },
 
+          onSearchStatus: (status) => {
+            dispatch({ type: "SET_SEARCH_STATUS", payload: status });
+          },
+
+          onSources: (_results, _query) => {
+            // Sources are stored in the message after done
+          },
+
           onDone: (result) => {
             resolved = true;
             const latency = Date.now() - now;
             dispatch({ type: "SET_LATENCY", payload: latency });
+            dispatch({ type: "SET_SEARCH_STATUS", payload: null });
 
             // Replace with final data
             dispatch({
@@ -92,6 +101,7 @@ export function useChat() {
                 content: result.assistantMessage.content,
                 usage: result.assistantMessage.usage,
                 status: "complete",
+                searchResults: result.assistantMessage.searchResults,
               },
             });
 
@@ -106,6 +116,7 @@ export function useChat() {
             resolved = true;
             dispatch({ type: "SET_LAST_ERROR", payload: error.message });
             dispatch({ type: "SET_CHAT_STATUS", payload: "error" });
+            dispatch({ type: "SET_SEARCH_STATUS", payload: null });
             dispatch({
               type: "UPDATE_LAST_MESSAGE",
               payload: { status: "error", error: error.message },

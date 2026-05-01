@@ -12,6 +12,7 @@ import type {
   Message,
   Model,
   Prompt,
+  SearchStatus,
   Session,
   SessionSummary,
 } from "../types";
@@ -28,6 +29,7 @@ interface AppState {
   lastLatencyMs: number | null;
   lastError: string | null;
   requestStartedAt: number | null;
+  searchStatus: SearchStatus | null;
 }
 
 type Action =
@@ -42,6 +44,7 @@ type Action =
   | { type: "SET_LATENCY"; payload: number }
   | { type: "SET_LAST_ERROR"; payload: string | null }
   | { type: "SET_REQUEST_STARTED"; payload: number | null }
+  | { type: "SET_SEARCH_STATUS"; payload: SearchStatus | null }
   | { type: "APPEND_MESSAGE"; payload: Message }
   | { type: "APPEND_DELTA"; payload: string }
   | { type: "UPDATE_LAST_MESSAGE"; payload: Partial<Message> }
@@ -59,6 +62,7 @@ const initialState: AppState = {
   lastLatencyMs: null,
   lastError: null,
   requestStartedAt: null,
+  searchStatus: null,
 };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -101,6 +105,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, lastError: action.payload };
     case "SET_REQUEST_STARTED":
       return { ...state, requestStartedAt: action.payload };
+    case "SET_SEARCH_STATUS":
+      return { ...state, searchStatus: action.payload };
     case "APPEND_MESSAGE":
       if (!state.activeSession) return state;
       return {
