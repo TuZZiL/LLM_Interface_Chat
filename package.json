@@ -6,7 +6,7 @@
     "build": "npm run install:server && npm run install:client && npm run build --prefix client",
     "heroku-postbuild": "npm run build",
     "install:server": "npm ci --prefix server",
-    "install:client": "npm ci --prefix client",
+    "install:client": "npm ci --include=dev --prefix client",
     "start": "npm start --prefix server"
   },
   "engines": {
