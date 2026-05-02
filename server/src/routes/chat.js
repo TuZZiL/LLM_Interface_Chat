@@ -514,6 +514,7 @@ router.post("/stream", async (req, res, next) => {
     let currentMessages = addWebContext(mimoMessages, webContext.context);
     const apiParams = buildApiParams(params, modelConfig);
     let lastFinishReason = null;
+    let lastKeepAliveAt = Date.now();
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const isFinalIteration = iteration === MAX_TOOL_ITERATIONS - 1;
@@ -546,6 +547,9 @@ router.post("/stream", async (req, res, next) => {
             accumulatedReasoning += event.reasoningContent;
             if (modelConfig.provider !== "digitalocean") {
               res.write(`event: delta\ndata: ${JSON.stringify({ reasoningDelta: event.reasoningContent })}\n\n`);
+            } else if (Date.now() - lastKeepAliveAt > 10000) {
+              res.write(`event: ping\ndata: {}\n\n`);
+              lastKeepAliveAt = Date.now();
             }
           }
 
