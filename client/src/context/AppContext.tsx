@@ -56,7 +56,6 @@ type Action =
   | { type: "SET_REASONING_EFFORT"; payload: "high" | "max" }
   | { type: "APPEND_MESSAGE"; payload: Message }
   | { type: "APPEND_DELTA"; payload: string }
-  | { type: "APPEND_REASONING_DELTA"; payload: string }
   | { type: "UPDATE_LAST_MESSAGE"; payload: Partial<Message> }
   | { type: "REMOVE_MESSAGE"; payload: string }
   | { type: "CLEAR_ACTIVE_MESSAGES" };
@@ -189,24 +188,6 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         activeSession: { ...state.activeSession, messages: deltaUpdated },
-      };
-    case "APPEND_REASONING_DELTA":
-      if (!state.activeSession) return state;
-      const reasoningMsgs = state.activeSession.messages;
-      if (reasoningMsgs.length === 0) return state;
-      const reasoningUpdated = [...reasoningMsgs];
-      const reasoningLastMsg = reasoningUpdated[reasoningMsgs.length - 1];
-      reasoningUpdated[reasoningMsgs.length - 1] = {
-        ...reasoningLastMsg,
-        reasoningContent:
-          (reasoningLastMsg.reasoningContent || "") + action.payload,
-      };
-      return {
-        ...state,
-        activeSession: {
-          ...state.activeSession,
-          messages: reasoningUpdated,
-        },
       };
     case "UPDATE_LAST_MESSAGE":
       if (!state.activeSession) return state;

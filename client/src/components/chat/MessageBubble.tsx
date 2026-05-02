@@ -103,7 +103,10 @@ function formatError(message: string | null) {
 }
 
 function ReasoningSpoiler({ content }: { content?: string | null }) {
-  if (!content?.trim()) return null;
+  const text = content?.trim();
+  if (!text) return null;
+  const nonNoiseChars = text.replace(/[!\s]+/g, "");
+  if (text.length > 80 && nonNoiseChars.length / text.length < 0.05) return null;
 
   return (
     <details className="mt-3 rounded-lg border border-white/10 bg-black/25 px-3 py-2 group">
@@ -111,7 +114,7 @@ function ReasoningSpoiler({ content }: { content?: string | null }) {
         Reasoning
       </summary>
       <div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words border-t border-white/5 pt-2 text-[12px] leading-[1.5] text-outline-variant" style={{ overflowWrap: "anywhere" }}>
-        {content}
+        {text}
       </div>
     </details>
   );
