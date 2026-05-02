@@ -544,7 +544,9 @@ router.post("/stream", async (req, res, next) => {
           if (event.reasoningContent) {
             turnReasoning += event.reasoningContent;
             accumulatedReasoning += event.reasoningContent;
-            res.write(`event: delta\ndata: ${JSON.stringify({ reasoningDelta: event.reasoningContent })}\n\n`);
+            if (modelConfig.provider !== "digitalocean") {
+              res.write(`event: delta\ndata: ${JSON.stringify({ reasoningDelta: event.reasoningContent })}\n\n`);
+            }
           }
 
           if (event.toolCalls) {

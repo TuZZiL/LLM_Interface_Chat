@@ -13,9 +13,7 @@ function buildBody({ model, messages, stream, params = {} }) {
   const body = { model, messages, stream };
   Object.assign(body, params);
   const requestedMax = body.max_completion_tokens ?? body.max_tokens;
-  if (requestedMax === undefined) {
-    body.max_completion_tokens = MAX_COMPLETION_TOKENS;
-  } else if (requestedMax > MAX_COMPLETION_TOKENS) {
+  if (requestedMax > MAX_COMPLETION_TOKENS) {
     body.max_completion_tokens = MAX_COMPLETION_TOKENS;
     delete body.max_tokens;
   }
