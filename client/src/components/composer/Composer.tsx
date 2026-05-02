@@ -13,10 +13,24 @@ export function Composer() {
   const fileRef = useRef<HTMLInputElement>(null);
   const { upload, uploading } = useUpload();
   const { sendMessage, chatStatus } = useChat();
-  const { activeSession, updateActiveSession } = useSessions();
+  const { activeSession, addSession, updateActiveSession } = useSessions();
   const { state } = useApp();
 
   const loading = chatStatus === "sending" || chatStatus === "streaming";
+
+  const getDefaultModel = useCallback(
+    (needsImageModel: boolean) => {
+      const defaultFor = needsImageModel ? "image" : "text";
+      return (
+        state.models.find((model) => model.defaultFor === defaultFor)?.id ||
+        state.models.find((model) =>
+          needsImageModel ? model.supportsImages : model.supportsText
+        )?.id ||
+        "mimo-v2.5-pro"
+      );
+    },
+    [state.models]
+  );
 
   const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,30 +62,40 @@ export function Composer() {
   };
 
   const handleSend = useCallback(async () => {
-    if (!activeSession) return;
     if (!text.trim() && attachments.length === 0) return;
 
     const textToSend = text.trim();
     const attToSend = [...attachments];
+    const hasAttachments = attToSend.length > 0;
+    let session = activeSession;
+
+    if (!session) {
+      const defaultPrompt = state.prompts.find((p) => p.isDefault)?.id;
+      session = await addSession(getDefaultModel(hasAttachments), defaultPrompt);
+    }
+    if (!session) return;
 
     // Clear input immediately
     setText("");
     setAttachments([]);
 
     await sendMessage({
-      sessionId: activeSession.id,
-      model: activeSession.model,
-      systemPromptId: activeSession.systemPromptId || undefined,
+      sessionId: session.id,
+      model: session.model,
+      systemPromptId: session.systemPromptId || undefined,
       text: textToSend,
-      attachments: attToSend.length > 0 ? attToSend : undefined,
+      attachments: hasAttachments ? attToSend : undefined,
       params: state.chatParams,
     });
   }, [
     activeSession,
     text,
     attachments,
+    addSession,
+    getDefaultModel,
     sendMessage,
     state.chatParams,
+    state.prompts,
   ]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -81,7 +105,7 @@ export function Composer() {
     }
   };
 
-  const disabled = loading || uploading || !activeSession;
+  const disabled = loading || uploading;
   const hasImages = attachments.length > 0;
 
   return (
@@ -134,7 +158,7 @@ export function Composer() {
             onKeyDown={handleKeyDown}
             disabled={disabled}
             placeholder={
-              activeSession ? "Type a message..." : "Select a session first"
+              activeSession ? "Type a message..." : "Type to start a new chat..."
             }
             minRows={1}
             maxRows={6}

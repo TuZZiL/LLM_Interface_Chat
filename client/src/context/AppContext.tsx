@@ -79,12 +79,28 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, prompts: action.payload };
     case "SET_SESSIONS":
       return { ...state, sessions: action.payload };
-    case "SET_ACTIVE_SESSION":
+    case "SET_ACTIVE_SESSION": {
+      const nextSession = action.payload;
       return {
         ...state,
-        activeSession: action.payload,
-        activeSessionId: action.payload?.id ?? null,
+        activeSession: nextSession,
+        activeSessionId: nextSession?.id ?? null,
+        sessions: nextSession
+          ? state.sessions.map((session) =>
+              session.id === nextSession.id
+                ? {
+                    id: nextSession.id,
+                    title: nextSession.title,
+                    model: nextSession.model,
+                    systemPromptId: nextSession.systemPromptId,
+                    createdAt: nextSession.createdAt,
+                    updatedAt: nextSession.updatedAt,
+                  }
+                : session
+            )
+          : state.sessions,
       };
+    }
     case "ADD_SESSION":
       return { ...state, sessions: [action.payload, ...state.sessions] };
     case "DELETE_SESSION":

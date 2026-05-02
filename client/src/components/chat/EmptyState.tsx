@@ -9,7 +9,7 @@ export function EmptyState() {
           MiMo Chat
         </h2>
         <p className="text-outline text-label font-mono uppercase">
-          Start a conversation
+          Write below to start
         </p>
       </div>
     </div>
