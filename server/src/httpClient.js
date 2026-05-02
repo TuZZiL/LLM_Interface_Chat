@@ -12,7 +12,7 @@ export async function fetchJsonWithTimeout(url, init, timeoutMs) {
         data = null;
       }
     }
-    return { res, data, text };
+    return { res, data: data ?? {}, text };
   } catch (err) {
     if (err.name === "AbortError") {
       throw new Error(`Request timed out after ${timeoutMs}ms`);

@@ -41,7 +41,12 @@ function isProviderAvailable(name) {
 }
 
 function buildCacheKey(type, provider, identifier, options) {
-  return `${type}:${provider}:${identifier}:${JSON.stringify(options || {})}`;
+  const opts = options || {};
+  const serialized = Object.keys(opts)
+    .sort()
+    .map((k) => `${k}=${JSON.stringify(opts[k])}`)
+    .join("&");
+  return `${type}:${provider}:${identifier}:${serialized}`;
 }
 
 function searchOptionsForProvider(provider, options) {
@@ -142,15 +147,31 @@ export async function runWebExtract({ urls, provider = "auto", options = {}, cac
     if (provider === "tavily") {
       const fetched = uncachedUrls.length > 0
         ? await tavilyExtract(uncachedUrls, opts)
-        : { provider: "tavily", results: [] };
-      result = { provider: "tavily", results: [...cachedResults, ...(fetched.results || [])] };
+        : { provider: "tavily", results: [], failedResults: [] };
+      result = {
+        provider: "tavily",
+        results: [...cachedResults, ...(fetched.results || [])],
+        failedResults: fetched.failedResults || [],
+      };
     } else {
-      const results = [...cachedResults];
-      for (const url of uncachedUrls) {
-        const r = await firecrawlScrape(url, opts);
-        results.push(r);
+      const settled = await Promise.allSettled(
+        uncachedUrls.map((url) => firecrawlScrape(url, opts))
+      );
+      const fetched = [];
+      const failed = [];
+      for (let i = 0; i < settled.length; i++) {
+        const s = settled[i];
+        if (s.status === "fulfilled") {
+          fetched.push(s.value);
+        } else {
+          failed.push({ url: uncachedUrls[i], error: s.reason?.message || String(s.reason) });
+        }
       }
-      result = { provider: "firecrawl", results };
+      result = {
+        provider: "firecrawl",
+        results: [...cachedResults, ...fetched],
+        failedResults: failed,
+      };
     }
 
     // Cache individual results
@@ -180,23 +201,31 @@ export async function runWebExtract({ urls, provider = "auto", options = {}, cac
         }
       }
       if (uncachedUrls.length === 0) {
-        return { provider: "firecrawl", results: cachedResults };
+        return { provider: "firecrawl", results: cachedResults, failedResults: [] };
       }
     } else {
       uncachedUrls.push(...urlList);
     }
 
-    try {
-      const results = [...cachedResults];
-      for (const url of uncachedUrls) {
-        const r = await firecrawlScrape(url, opts);
-        results.push(r);
-        cache?.set(buildCacheKey("extract", "firecrawl", url, opts), r);
+    const settled = await Promise.allSettled(
+      uncachedUrls.map((url) => firecrawlScrape(url, opts))
+    );
+    const fetched = [];
+    const failed = [];
+    for (let i = 0; i < settled.length; i++) {
+      const s = settled[i];
+      if (s.status === "fulfilled") {
+        fetched.push(s.value);
+        cache?.set(buildCacheKey("extract", "firecrawl", uncachedUrls[i], opts), s.value);
+      } else {
+        failed.push({ url: uncachedUrls[i], error: s.reason?.message || String(s.reason) });
       }
-      return { provider: "firecrawl", results };
-    } catch (err) {
-      errors.push(`firecrawl: ${err.message}`);
     }
+    const allResults = [...cachedResults, ...fetched];
+    if (allResults.length > 0) {
+      return { provider: "firecrawl", results: allResults, failedResults: failed };
+    }
+    errors.push(`firecrawl: all ${failed.length} URL(s) failed`);
   }
 
   if (isProviderAvailable("tavily")) {
@@ -212,7 +241,7 @@ export async function runWebExtract({ urls, provider = "auto", options = {}, cac
         }
       }
       if (uncachedUrls.length === 0) {
-        return { provider: "tavily", results: cachedResults };
+        return { provider: "tavily", results: cachedResults, failedResults: [] };
       }
     } else {
       uncachedUrls.push(...urlList);
@@ -225,7 +254,11 @@ export async function runWebExtract({ urls, provider = "auto", options = {}, cac
           cache.set(buildCacheKey("extract", "tavily", r.url, opts), r);
         }
       }
-      return { provider: "tavily", results: [...cachedResults, ...(result.results || [])] };
+      return {
+        provider: "tavily",
+        results: [...cachedResults, ...(result.results || [])],
+        failedResults: result.failedResults || [],
+      };
     } catch (err) {
       errors.push(`tavily: ${err.message}`);
     }
@@ -238,5 +271,6 @@ function mergeExtractResults(provider, cachedResults) {
   return {
     provider,
     results: cachedResults,
+    failedResults: [],
   };
 }

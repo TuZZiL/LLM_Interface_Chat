@@ -83,15 +83,24 @@ export async function firecrawlScrape(url, options = {}) {
     throw new Error(data?.error || "Firecrawl scrape failed");
   }
 
+  const markdown = data.data?.markdown || "";
+  const metaTitle = data.data?.metadata?.title || null;
+  const metaDescription = data.data?.metadata?.description || null;
+  const sourceURL = data.data?.metadata?.sourceURL || url;
+
   return {
     provider: "firecrawl",
     url,
-    markdown: data.data?.markdown || "",
-    content: data.data?.markdown || "",
+    title: metaTitle,
+    content: markdown,
+    rawContent: markdown,
+    markdown,
+    images: [],
+    favicon: null,
     metadata: {
-      title: data.data?.metadata?.title,
-      description: data.data?.metadata?.description,
-      sourceURL: data.data?.metadata?.sourceURL,
+      title: metaTitle,
+      description: metaDescription,
+      sourceURL,
     },
   };
 }

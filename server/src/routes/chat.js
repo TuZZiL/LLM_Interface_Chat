@@ -191,7 +191,8 @@ async function buildWebContext(textContent, notify = null, webCache = null) {
           });
         }
       } catch (err) {
-        contextParts.push(`Scrape failed for ${url}: ${err.message}`);
+        console.warn(`[buildWebContext] scrape failed for ${url}:`, err.message);
+        contextParts.push(`Scrape failed for ${url}.`);
       }
     }
   }
@@ -205,7 +206,8 @@ async function buildWebContext(textContent, notify = null, webCache = null) {
         sources.push(...search.results);
       }
     } catch (err) {
-      contextParts.push(`Web search failed: ${err.message}`);
+      console.warn(`[buildWebContext] search failed:`, err.message);
+      contextParts.push(`Web search failed.`);
     }
   }
 
@@ -488,7 +490,7 @@ router.post("/stream", async (req, res, next) => {
 
     const textContent = userMessages[userMessages.length - 1]?.content || "";
     const mimoMessages = buildMessages(systemContent, session, textContent, attachments, historyImages);
-    const tools = getEnabledTools();
+    const tools = modelConfig.supportsTools ? getEnabledTools() : [];
     const webCache = new Map();
 
     // Set SSE headers
@@ -631,9 +633,9 @@ router.post("/stream", async (req, res, next) => {
         } else if (toolResult.type === "extract" && toolResult.result?.results) {
           for (const r of toolResult.result.results) {
             allSearchResults.push({
-              title: r.title || r.metadata?.title,
+              title: r.title || r.metadata?.title || r.url,
               url: r.url || r.metadata?.sourceURL,
-              content: r.metadata?.description || (r.content || r.markdown || "").slice(0, 300),
+              content: r.metadata?.description || (r.content || "").slice(0, 300),
             });
           }
         } else if (toolResult.type === "scrape" && toolResult.result?.metadata) {

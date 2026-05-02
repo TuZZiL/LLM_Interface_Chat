@@ -66,7 +66,6 @@ export async function tavilyExtract(urls, options = {}) {
   const body = {
     urls,
     extract_depth: "basic",
-    format: "markdown",
     include_images: false,
     include_favicon: false,
     ...options,

@@ -17,7 +17,8 @@ export const MODELS = [
     label: "MiMo-V2.5-Pro",
     supportsText: true,
     supportsImages: false,
-    supportsThinking: false,
+    supportsThinking: true,
+    supportsTools: true,
     defaultFor: "text",
   },
   {
@@ -26,7 +27,8 @@ export const MODELS = [
     label: "MiMo-V2.5",
     supportsText: true,
     supportsImages: true,
-    supportsThinking: false,
+    supportsThinking: true,
+    supportsTools: true,
     defaultFor: "image",
   },
   {
@@ -36,6 +38,7 @@ export const MODELS = [
     supportsText: true,
     supportsImages: false,
     supportsThinking: true,
+    supportsTools: true,
     defaultFor: null,
   },
   {
@@ -45,6 +48,7 @@ export const MODELS = [
     supportsText: true,
     supportsImages: true,
     supportsThinking: false,
+    supportsTools: true,
     defaultFor: null,
   },
   {
@@ -54,6 +58,7 @@ export const MODELS = [
     supportsText: true,
     supportsImages: false,
     supportsThinking: false,
+    supportsTools: false,
     defaultFor: null,
   },
   {
@@ -63,6 +68,7 @@ export const MODELS = [
     supportsText: true,
     supportsImages: false,
     supportsThinking: false,
+    supportsTools: false,
     defaultFor: null,
   },
 ];
