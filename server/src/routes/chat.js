@@ -2,8 +2,10 @@ import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import {
   FIRECRAWL_ENABLED,
-  ERROR_CODES,
   TAVILY_ENABLED,
+  TAVILY_API_KEY,
+  FIRECRAWL_API_KEY,
+  ERROR_CODES,
   getEnabledTools,
   getModelById,
 } from "../config.js";
@@ -13,8 +15,7 @@ import {
   chatCompletion as deepseekChat,
   chatCompletionStream as deepseekStream,
 } from "../deepseekClient.js";
-import { tavilySearch } from "../tavilyClient.js";
-import { firecrawlScrape } from "../firecrawlClient.js";
+import { runWebSearch, runWebExtract } from "../webTools.js";
 
 const MAX_TOOL_ITERATIONS = 4;
 const MAX_WEB_RESULTS = 5;
@@ -145,7 +146,8 @@ function getUrls(text) {
 }
 
 function shouldSearchWeb(text) {
-  return TAVILY_ENABLED && WEB_INTENT_RE.test(text);
+  const searchAvailable = (TAVILY_ENABLED && !!TAVILY_API_KEY) || (FIRECRAWL_ENABLED && !!FIRECRAWL_API_KEY);
+  return searchAvailable && WEB_INTENT_RE.test(text);
 }
 
 function formatSearchContext(results) {
@@ -159,24 +161,29 @@ function formatSearchContext(results) {
     .join("\n\n");
 }
 
-async function buildWebContext(textContent, notify = null) {
+async function buildWebContext(textContent, notify = null, webCache = null) {
   const contextParts = [];
   const sources = [];
   const urls = getUrls(textContent);
 
-  if (FIRECRAWL_ENABLED && urls.length > 0) {
+  const extractAvailable = (TAVILY_ENABLED && !!TAVILY_API_KEY) || (FIRECRAWL_ENABLED && !!FIRECRAWL_API_KEY);
+
+  if (extractAvailable && urls.length > 0) {
     for (const url of urls) {
       notify?.({ status: "scraping", url });
       try {
-        const scraped = await firecrawlScrape(url);
-        const title = scraped.metadata?.title || url;
-        const content = scraped.markdown.slice(0, 6000);
-        contextParts.push(`Scraped page: ${title}\nURL: ${url}\n${content}`);
-        sources.push({
-          title,
-          url,
-          content: scraped.metadata?.description || content.slice(0, 300),
-        });
+        const result = await runWebExtract({ urls: url, provider: "auto", cache: webCache });
+        const page = result.results?.[0];
+        if (page) {
+          const title = page.title || page.metadata?.title || url;
+          const content = (page.content || page.markdown || "").slice(0, 6000);
+          contextParts.push(`Scraped page: ${title}\nURL: ${url}\n${content}`);
+          sources.push({
+            title,
+            url,
+            content: page.metadata?.description || content.slice(0, 300),
+          });
+        }
       } catch (err) {
         contextParts.push(`Scrape failed for ${url}: ${err.message}`);
       }
@@ -186,7 +193,7 @@ async function buildWebContext(textContent, notify = null) {
   if (shouldSearchWeb(textContent)) {
     notify?.({ status: "searching", query: textContent });
     try {
-      const search = await tavilySearch(textContent, { max_results: MAX_WEB_RESULTS });
+      const search = await runWebSearch({ query: textContent, provider: "auto", options: { max_results: MAX_WEB_RESULTS }, cache: webCache });
       if (search.results.length > 0) {
         contextParts.push(`Web search results for: ${textContent}\n${formatSearchContext(search.results)}`);
         sources.push(...search.results);
@@ -270,7 +277,7 @@ async function saveMessages(
 
 // --- Tool execution ---
 
-async function executeToolCall(toolCall) {
+async function executeToolCall(toolCall, webCache = null) {
   const fnName = toolCall.function?.name;
   let args;
   try {
@@ -281,7 +288,12 @@ async function executeToolCall(toolCall) {
 
   if (fnName === "web_search") {
     try {
-      const result = await tavilySearch(args.query);
+      const result = await runWebSearch({
+        query: args.query,
+        provider: args.provider || "auto",
+        options: args.maxResults ? { max_results: args.maxResults } : {},
+        cache: webCache,
+      });
       return {
         toolCallId: toolCall.id,
         result,
@@ -293,12 +305,43 @@ async function executeToolCall(toolCall) {
     }
   }
 
-  if (fnName === "scrape_url") {
+  if (fnName === "web_extract") {
     try {
-      const result = await firecrawlScrape(args.url);
+      const urls = args.urls || (args.url ? [args.url] : []);
+      if (urls.length === 0) {
+        return { toolCallId: toolCall.id, result: { error: "No URLs provided" } };
+      }
+      const result = await runWebExtract({
+        urls,
+        provider: args.provider || "auto",
+        options: args.format ? { format: args.format } : {},
+        cache: webCache,
+      });
       return {
         toolCallId: toolCall.id,
         result,
+        type: "extract",
+        urls,
+      };
+    } catch (err) {
+      return { toolCallId: toolCall.id, result: { error: err.message } };
+    }
+  }
+
+  if (fnName === "scrape_url") {
+    try {
+      const result = await runWebExtract({
+        urls: args.url,
+        provider: "auto",
+        cache: webCache,
+      });
+      return {
+        toolCallId: toolCall.id,
+        result: {
+          provider: result.provider,
+          markdown: result.results?.[0]?.content || result.results?.[0]?.markdown || "",
+          metadata: result.results?.[0]?.metadata || { title: result.results?.[0]?.title, sourceURL: args.url },
+        },
         type: "scrape",
         url: args.url,
       };
@@ -376,7 +419,8 @@ router.post("/", async (req, res, next) => {
     }
 
     const textContent = userMessages[userMessages.length - 1]?.content || "";
-    const webContext = await buildWebContext(textContent);
+    const webCache = new Map();
+    const webContext = await buildWebContext(textContent, null, webCache);
     const mimoMessages = addWebContext(
       buildMessages(systemContent, session, textContent, attachments, historyImages),
       webContext.context
@@ -439,6 +483,7 @@ router.post("/stream", async (req, res, next) => {
     const textContent = userMessages[userMessages.length - 1]?.content || "";
     const mimoMessages = buildMessages(systemContent, session, textContent, attachments, historyImages);
     const tools = getEnabledTools();
+    const webCache = new Map();
 
     // Set SSE headers
     res.writeHead(200, {
@@ -457,7 +502,7 @@ router.post("/stream", async (req, res, next) => {
 
     const webContext = await buildWebContext(textContent, (status) => {
       res.write(`event: searchStatus\ndata: ${JSON.stringify(status)}\n\n`);
-    });
+    }, webCache);
     allSearchResults.push(...webContext.sources);
 
     let currentMessages = addWebContext(mimoMessages, webContext.context);
@@ -547,23 +592,38 @@ router.post("/stream", async (req, res, next) => {
       for (const tc of toolCallsArray) {
         const fnName = tc.function?.name;
 
-        // Notify client about search/scrape
+        // Notify client about search/extract/scrape
         if (fnName === "web_search") {
           let query = "";
           try { query = JSON.parse(tc.function.arguments).query; } catch {}
           res.write(`event: searchStatus\ndata: ${JSON.stringify({ status: "searching", query })}\n\n`);
+        } else if (fnName === "web_extract") {
+          let extractUrl = "";
+          try {
+            const a = JSON.parse(tc.function.arguments);
+            extractUrl = a.url || (a.urls && a.urls[0]) || "";
+          } catch {}
+          res.write(`event: searchStatus\ndata: ${JSON.stringify({ status: "scraping", url: extractUrl })}\n\n`);
         } else if (fnName === "scrape_url") {
           let url = "";
           try { url = JSON.parse(tc.function.arguments).url; } catch {}
           res.write(`event: searchStatus\ndata: ${JSON.stringify({ status: "scraping", url })}\n\n`);
         }
 
-        const toolResult = await executeToolCall(tc);
+        const toolResult = await executeToolCall(tc, webCache);
 
         // Collect search results for UI
         if (toolResult.type === "search" && toolResult.result?.results) {
           allSearchResults.push(...toolResult.result.results);
           res.write(`event: sources\ndata: ${JSON.stringify({ results: toolResult.result.results, query: toolResult.query })}\n\n`);
+        } else if (toolResult.type === "extract" && toolResult.result?.results) {
+          for (const r of toolResult.result.results) {
+            allSearchResults.push({
+              title: r.title || r.metadata?.title,
+              url: r.url || r.metadata?.sourceURL,
+              content: r.metadata?.description || (r.content || r.markdown || "").slice(0, 300),
+            });
+          }
         } else if (toolResult.type === "scrape" && toolResult.result?.metadata) {
           allSearchResults.push({
             title: toolResult.result.metadata.title,

@@ -69,37 +69,64 @@ export const WEB_SEARCH_TOOL = {
   function: {
     name: "web_search",
     description:
-      "Search the web for current information. Use when the user asks about recent events, facts you are unsure about, or needs up-to-date data.",
+      "Search the web for current or external information. Use when the user asks about recent events, up-to-date facts, unknown facts, or broad discovery.",
     parameters: {
       type: "object",
       properties: {
         query: { type: "string", description: "The search query to find relevant information" },
+        provider: {
+          type: "string",
+          enum: ["auto", "tavily", "firecrawl"],
+          description: "Optional provider override. Use auto unless the user asks for a specific provider.",
+        },
+        maxResults: {
+          type: "integer",
+          minimum: 1,
+          maximum: 10,
+          description: "Maximum number of results to return.",
+        },
       },
       required: ["query"],
     },
   },
 };
 
-export const SCRAPE_URL_TOOL = {
+export const WEB_EXTRACT_TOOL = {
   type: "function",
   function: {
-    name: "scrape_url",
+    name: "web_extract",
     description:
-      "Extract the content of a web page as markdown. Use when the user shares a URL and wants you to read or analyze its content.",
+      "Extract readable content from one or more specific URLs. Use when the user gives a URL or when search results need deeper page content.",
     parameters: {
       type: "object",
       properties: {
-        url: { type: "string", description: "The full URL to scrape" },
+        url: { type: "string", description: "A single URL to extract content from" },
+        urls: {
+          type: "array",
+          items: { type: "string" },
+          description: "Multiple URLs to extract content from",
+        },
+        provider: {
+          type: "string",
+          enum: ["auto", "tavily", "firecrawl"],
+          description: "Optional provider override. Use auto unless the user asks for a specific provider.",
+        },
+        format: {
+          type: "string",
+          enum: ["markdown", "text"],
+          description: "Content format preference",
+        },
       },
-      required: ["url"],
     },
   },
 };
 
 export function getEnabledTools() {
   const tools = [];
-  if (TAVILY_ENABLED) tools.push(WEB_SEARCH_TOOL);
-  if (FIRECRAWL_ENABLED) tools.push(SCRAPE_URL_TOOL);
+  const searchAvailable = (TAVILY_ENABLED && !!TAVILY_API_KEY) || (FIRECRAWL_ENABLED && !!FIRECRAWL_API_KEY);
+  const extractAvailable = (TAVILY_ENABLED && !!TAVILY_API_KEY) || (FIRECRAWL_ENABLED && !!FIRECRAWL_API_KEY);
+  if (searchAvailable) tools.push(WEB_SEARCH_TOOL);
+  if (extractAvailable) tools.push(WEB_EXTRACT_TOOL);
   return tools;
 }
 

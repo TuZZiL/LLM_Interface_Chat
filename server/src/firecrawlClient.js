@@ -1,45 +1,15 @@
 import { FIRECRAWL_API_KEY } from "./config.js";
+import { fetchJsonWithTimeout } from "./httpClient.js";
 
 const FIRECRAWL_BASE = "https://api.firecrawl.dev/v2";
 
-export async function firecrawlScrape(url, options = {}) {
-  if (!FIRECRAWL_API_KEY) {
-    throw new Error("FIRECRAWL_API_KEY is not configured");
-  }
+const SEARCH_TIMEOUT = 20000;
+const SCRAPE_TIMEOUT = 45000;
 
-  const body = {
-    url,
-    formats: ["markdown"],
-    ...options,
-  };
-
-  const res = await fetch(`${FIRECRAWL_BASE}/scrape`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Firecrawl scrape failed (${res.status}): ${text}`);
-  }
-
-  const data = await res.json();
-
-  if (!data.success) {
-    throw new Error(data.error || "Firecrawl scrape failed");
-  }
-
+function authHeaders() {
   return {
-    markdown: data.data?.markdown || "",
-    metadata: {
-      title: data.data?.metadata?.title,
-      description: data.data?.metadata?.description,
-      sourceURL: data.data?.metadata?.sourceURL,
-    },
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
   };
 }
 
@@ -54,31 +24,74 @@ export async function firecrawlSearch(query, options = {}) {
     ...options,
   };
 
-  const res = await fetch(`${FIRECRAWL_BASE}/search`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const { res, data, text } = await fetchJsonWithTimeout(
+    `${FIRECRAWL_BASE}/search`,
+    { method: "POST", headers: authHeaders(), body: JSON.stringify(body) },
+    SEARCH_TIMEOUT
+  );
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Firecrawl search failed (${res.status}): ${text}`);
+    const detail = data?.error || text || res.statusText;
+    throw new Error(`Firecrawl search failed (${res.status}): ${detail}`);
   }
 
-  const data = await res.json();
+  if (!data?.success) {
+    throw new Error(data?.error || "Firecrawl search failed");
+  }
 
-  if (!data.success) {
-    throw new Error(data.error || "Firecrawl search failed");
+  // Handle both response shapes:
+  // Without scrapeOptions: { data: { web: [...] } }
+  // With scrapeOptions: { data: [ { title, url, markdown, ... } ] }
+  const web = Array.isArray(data.data) ? data.data : data.data?.web || [];
+
+  return {
+    provider: "firecrawl",
+    results: web.map((r, i) => ({
+      title: r.title || null,
+      url: r.url,
+      content: r.markdown || r.description || null,
+      description: r.description || null,
+      position: r.position ?? i + 1,
+      markdown: r.markdown || null,
+    })),
+  };
+}
+
+export async function firecrawlScrape(url, options = {}) {
+  if (!FIRECRAWL_API_KEY) {
+    throw new Error("FIRECRAWL_API_KEY is not configured");
+  }
+
+  const body = {
+    url,
+    formats: ["markdown"],
+    ...options,
+  };
+
+  const { res, data, text } = await fetchJsonWithTimeout(
+    `${FIRECRAWL_BASE}/scrape`,
+    { method: "POST", headers: authHeaders(), body: JSON.stringify(body) },
+    SCRAPE_TIMEOUT
+  );
+
+  if (!res.ok) {
+    const detail = data?.error || text || res.statusText;
+    throw new Error(`Firecrawl scrape failed (${res.status}): ${detail}`);
+  }
+
+  if (!data?.success) {
+    throw new Error(data?.error || "Firecrawl scrape failed");
   }
 
   return {
-    results: (data.data?.web || []).map((r) => ({
-      title: r.title,
-      url: r.url,
-      content: r.description,
-    })),
+    provider: "firecrawl",
+    url,
+    markdown: data.data?.markdown || "",
+    content: data.data?.markdown || "",
+    metadata: {
+      title: data.data?.metadata?.title,
+      description: data.data?.metadata?.description,
+      sourceURL: data.data?.metadata?.sourceURL,
+    },
   };
 }
