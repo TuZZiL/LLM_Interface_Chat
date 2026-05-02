@@ -15,6 +15,10 @@ import {
   chatCompletion as deepseekChat,
   chatCompletionStream as deepseekStream,
 } from "../deepseekClient.js";
+import {
+  chatCompletion as digitalOceanChat,
+  chatCompletionStream as digitalOceanStream,
+} from "../digitaloceanClient.js";
 import { runWebSearch, runWebExtract } from "../webTools.js";
 
 const MAX_TOOL_ITERATIONS = 4;
@@ -130,11 +134,13 @@ function buildApiParams(requestParams, modelConfig) {
 
 function callChat(modelConfig, args) {
   if (modelConfig.provider === "deepseek") return deepseekChat(args);
+  if (modelConfig.provider === "digitalocean") return digitalOceanChat(args);
   return chatCompletion(args);
 }
 
 function callStream(modelConfig, args) {
   if (modelConfig.provider === "deepseek") return deepseekStream(args);
+  if (modelConfig.provider === "digitalocean") return digitalOceanStream(args);
   return chatCompletionStream(args);
 }
 

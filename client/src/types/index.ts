@@ -1,6 +1,6 @@
 export interface Model {
   id: string;
-  provider: "mimo" | "deepseek";
+  provider: "mimo" | "deepseek" | "digitalocean";
   label: string;
   supportsText: boolean;
   supportsImages: boolean;

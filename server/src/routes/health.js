@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   DEEPSEEK_API_KEY,
   DEEPSEEK_BASE_URL,
+  DIGITALOCEAN_API_KEY,
+  DIGITALOCEAN_BASE_URL,
   MIMO_API_KEY,
   MIMO_BASE_URL,
 } from "../config.js";
@@ -20,6 +22,10 @@ router.get("/", (_req, res) => {
       deepseek: {
         apiKeyConfigured: !!DEEPSEEK_API_KEY,
         baseUrl: DEEPSEEK_BASE_URL,
+      },
+      digitalocean: {
+        apiKeyConfigured: !!DIGITALOCEAN_API_KEY,
+        baseUrl: DIGITALOCEAN_BASE_URL,
       },
     },
     webTools: getWebCapabilities(),

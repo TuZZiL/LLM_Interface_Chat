@@ -11,6 +11,7 @@ interface HealthData {
   providers: {
     mimo: ProviderHealth;
     deepseek: ProviderHealth;
+    digitalocean: ProviderHealth;
   };
 }
 

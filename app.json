@@ -33,6 +33,15 @@
       "description": "Enable Firecrawl scraping when FIRECRAWL_API_KEY is configured.",
       "value": "true",
       "required": false
+    },
+    "DIGITALOCEAN_API_KEY": {
+      "description": "Optional DigitalOcean model access key for Serverless Inference.",
+      "required": false
+    },
+    "DIGITALOCEAN_BASE_URL": {
+      "description": "DigitalOcean Serverless Inference base URL.",
+      "value": "https://inference.do-ai.run",
+      "required": false
     }
   },
   "addons": [

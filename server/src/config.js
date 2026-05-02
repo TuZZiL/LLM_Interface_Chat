@@ -7,6 +7,9 @@ export const MIMO_BASE_URL = process.env.MIMO_BASE_URL || "https://api.xiaomimim
 export const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "";
 export const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
 
+export const DIGITALOCEAN_API_KEY = process.env.DIGITALOCEAN_API_KEY || process.env.DIGITALOCEAN_TOKEN || "";
+export const DIGITALOCEAN_BASE_URL = process.env.DIGITALOCEAN_BASE_URL || "https://inference.do-ai.run";
+
 export const MODELS = [
   {
     id: "mimo-v2.5-pro",
@@ -33,6 +36,33 @@ export const MODELS = [
     supportsText: true,
     supportsImages: false,
     supportsThinking: true,
+    defaultFor: null,
+  },
+  {
+    id: "kimi-k2.5",
+    provider: "digitalocean",
+    label: "Kimi K2.5",
+    supportsText: true,
+    supportsImages: true,
+    supportsThinking: false,
+    defaultFor: null,
+  },
+  {
+    id: "minimax-m2.5",
+    provider: "digitalocean",
+    label: "MiniMax M2.5",
+    supportsText: true,
+    supportsImages: true,
+    supportsThinking: false,
+    defaultFor: null,
+  },
+  {
+    id: "nvidia-nemotron-3-super-120b",
+    provider: "digitalocean",
+    label: "NVIDIA Nemotron 3 Super 120B",
+    supportsText: true,
+    supportsImages: true,
+    supportsThinking: false,
     defaultFor: null,
   },
 ];
@@ -144,4 +174,5 @@ export const ERROR_CODES = {
   IMAGE_TOO_LARGE: "IMAGE_TOO_LARGE",
   MIMO_REQUEST_FAILED: "MIMO_REQUEST_FAILED",
   DEEPSEEK_REQUEST_FAILED: "DEEPSEEK_REQUEST_FAILED",
+  DIGITALOCEAN_REQUEST_FAILED: "DIGITALOCEAN_REQUEST_FAILED",
 };

@@ -74,12 +74,17 @@ export function useChat() {
 
       const sendableAttachments = opts.attachments?.filter((attachment) => attachment.dataUrl);
       const hasImages = (sendableAttachments?.length ?? 0) > 0;
-      const effectiveModel = hasImages ? "mimo-v2.5" : opts.model;
+      const requestedModelConfig = state.models.find((m) => m.id === opts.model);
+      const imageModel = state.models.find((m) => m.supportsImages);
+      const effectiveModel =
+        hasImages && !requestedModelConfig?.supportsImages
+          ? imageModel?.id || "mimo-v2.5"
+          : opts.model;
 
-      if (hasImages && opts.model !== "mimo-v2.5" && state.activeSession) {
+      if (effectiveModel !== opts.model && state.activeSession) {
         dispatch({
           type: "SET_ACTIVE_SESSION",
-          payload: { ...state.activeSession, model: "mimo-v2.5" },
+          payload: { ...state.activeSession, model: effectiveModel },
         });
       }
 
