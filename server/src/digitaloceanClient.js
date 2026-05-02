@@ -1,6 +1,8 @@
 import { DIGITALOCEAN_API_KEY, DIGITALOCEAN_BASE_URL, ERROR_CODES } from "./config.js";
 import { AppError } from "./mimoClient.js";
 
+const MAX_COMPLETION_TOKENS = 16_384;
+
 function assertApiKey() {
   if (!DIGITALOCEAN_API_KEY) {
     throw new AppError(ERROR_CODES.MISSING_API_KEY, "DIGITALOCEAN_API_KEY is not configured", 500);
@@ -10,6 +12,13 @@ function assertApiKey() {
 function buildBody({ model, messages, stream, params = {} }) {
   const body = { model, messages, stream };
   Object.assign(body, params);
+  const requestedMax = body.max_completion_tokens ?? body.max_tokens;
+  if (requestedMax === undefined) {
+    body.max_completion_tokens = MAX_COMPLETION_TOKENS;
+  } else if (requestedMax > MAX_COMPLETION_TOKENS) {
+    body.max_completion_tokens = MAX_COMPLETION_TOKENS;
+    delete body.max_tokens;
+  }
   return body;
 }
 

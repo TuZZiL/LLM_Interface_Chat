@@ -123,8 +123,13 @@ export function useChat() {
             console.log("[stream] start:", info.modelUsed);
           },
 
-          onDelta: (contentDelta) => {
-            dispatch({ type: "APPEND_DELTA", payload: contentDelta });
+          onDelta: (contentDelta, reasoningDelta) => {
+            if (contentDelta) {
+              dispatch({ type: "APPEND_DELTA", payload: contentDelta });
+            }
+            if (reasoningDelta) {
+              dispatch({ type: "APPEND_REASONING_DELTA", payload: reasoningDelta });
+            }
           },
 
           onSearchStatus: (status) => {

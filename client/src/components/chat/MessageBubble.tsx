@@ -102,6 +102,21 @@ function formatError(message: string | null) {
   return text;
 }
 
+function ReasoningSpoiler({ content }: { content?: string | null }) {
+  if (!content?.trim()) return null;
+
+  return (
+    <details className="mt-3 rounded-lg border border-white/10 bg-black/25 px-3 py-2 group">
+      <summary className="cursor-pointer select-none text-[10px] font-mono uppercase tracking-widest text-outline hover:text-cyan transition-colors">
+        Reasoning
+      </summary>
+      <div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words border-t border-white/5 pt-2 text-[12px] leading-[1.5] text-outline-variant" style={{ overflowWrap: "anywhere" }}>
+        {content}
+      </div>
+    </details>
+  );
+}
+
 export function MessageBubble({ message, canRegenerate = false, onRegenerate, searchStatus }: Props) {
   const isUser = message.role === "user";
   const isWaiting = message.status === "thinking" && !message.content;
@@ -181,26 +196,32 @@ export function MessageBubble({ message, canRegenerate = false, onRegenerate, se
         >
           {isWaiting ? (
             searchStatus ? (
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse" />
-                <span className="text-[11px] text-outline-variant">
-                  {searchStatus.status === "searching"
-                    ? `Searching: ${searchStatus.query}...`
-                    : `Reading: ${searchStatus.url}...`}
-                </span>
-              </div>
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse" />
+                  <span className="text-[11px] text-outline-variant">
+                    {searchStatus.status === "searching"
+                      ? `Searching: ${searchStatus.query}...`
+                      : `Reading: ${searchStatus.url}...`}
+                  </span>
+                </div>
+                <ReasoningSpoiler content={message.reasoningContent} />
+              </>
             ) : (
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse" />
-                <div
-                  className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse"
-                  style={{ animationDelay: "0.2s" }}
-                />
-                <div
-                  className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse"
-                  style={{ animationDelay: "0.4s" }}
-                />
-              </div>
+              <>
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse" />
+                  <div
+                    className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse"
+                    style={{ animationDelay: "0.2s" }}
+                  />
+                  <div
+                    className="w-1.5 h-1.5 bg-cyan/60 rounded-full animate-pulse"
+                    style={{ animationDelay: "0.4s" }}
+                  />
+                </div>
+                <ReasoningSpoiler content={message.reasoningContent} />
+              </>
             )
           ) : isError ? (
             <div className="space-y-3">
@@ -216,11 +237,16 @@ export function MessageBubble({ message, canRegenerate = false, onRegenerate, se
               )}
             </div>
           ) : (
-            <div className="min-w-0 text-on-surface text-[13px] font-body leading-[1.6] break-words" style={{ overflowWrap: "anywhere" }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {message.content}
-              </ReactMarkdown>
-            </div>
+            <>
+              {message.content && (
+                <div className="min-w-0 text-on-surface text-[13px] font-body leading-[1.6] break-words" style={{ overflowWrap: "anywhere" }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+              )}
+              <ReasoningSpoiler content={message.reasoningContent} />
+            </>
           )}
           {message.searchResults && message.searchResults.length > 0 && (
             <SearchSources results={message.searchResults} />
