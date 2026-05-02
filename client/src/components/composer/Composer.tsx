@@ -14,7 +14,7 @@ export function Composer() {
   const { upload, uploading } = useUpload();
   const { sendMessage, chatStatus } = useChat();
   const { activeSession, addSession, updateActiveSession } = useSessions();
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
 
   const loading = chatStatus === "sending" || chatStatus === "streaming";
 
@@ -52,6 +52,14 @@ export function Composer() {
             });
           }
         }
+      } else {
+        const draftModel = state.models.find((m) => m.id === state.draftModel);
+        if (draftModel && !draftModel.supportsImages) {
+          const imageModel = state.models.find((m) => m.supportsImages);
+          if (imageModel) {
+            dispatch({ type: "SET_DRAFT_MODEL", payload: imageModel.id });
+          }
+        }
       }
     }
     if (fileRef.current) fileRef.current.value = "";
@@ -70,8 +78,13 @@ export function Composer() {
     let session = activeSession;
 
     if (!session) {
-      const defaultPrompt = state.prompts.find((p) => p.isDefault)?.id;
-      session = await addSession(getDefaultModel(hasAttachments), defaultPrompt);
+      const imageModel = state.models.find((m) => m.supportsImages);
+      const draftModel = state.models.find((m) => m.id === state.draftModel);
+      const model =
+        hasAttachments && draftModel && !draftModel.supportsImages
+          ? imageModel?.id || getDefaultModel(true)
+          : state.draftModel || getDefaultModel(hasAttachments);
+      session = await addSession(model, state.draftSystemPromptId || undefined);
     }
     if (!session) return;
 
@@ -95,7 +108,9 @@ export function Composer() {
     getDefaultModel,
     sendMessage,
     state.chatParams,
-    state.prompts,
+    state.draftModel,
+    state.draftSystemPromptId,
+    state.models,
   ]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

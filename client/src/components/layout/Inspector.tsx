@@ -11,29 +11,31 @@ export function InspectorContent() {
   const { prompts } = usePrompts();
   const [promptModalOpen, setPromptModalOpen] = useState(false);
 
-  if (!activeSession) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-outline text-xs text-center px-4">
-          Select a session to see details
-        </div>
-      </div>
-    );
-  }
+  const activeModelId =
+    activeSession?.model ||
+    state.draftModel ||
+    state.models.find((m) => m.defaultFor === "text")?.id ||
+    state.models[0]?.id ||
+    "";
+  const activePromptId = activeSession?.systemPromptId ?? state.draftSystemPromptId;
 
   const currentPrompt = prompts.find(
-    (p) => p.id === activeSession.systemPromptId
+    (p) => p.id === activePromptId
   );
 
-  const activeModelConfig = state.models.find((m) => m.id === activeSession.model);
+  const activeModelConfig = state.models.find((m) => m.id === activeModelId);
   const supportsThinking = activeModelConfig?.supportsThinking ?? false;
   const thinkingActive = supportsThinking && state.thinkingEnabled;
 
   const handleModelChange = (modelId: string) => {
+    if (!activeSession) {
+      dispatch({ type: "SET_DRAFT_MODEL", payload: modelId });
+      return;
+    }
     updateActiveSession({ ...activeSession, model: modelId });
   };
 
-  const usage = activeSession.messages
+  const usage = (activeSession?.messages || [])
     .filter((m) => m.usage)
     .reduce(
       (acc, m) => {
@@ -63,7 +65,7 @@ export function InspectorContent() {
                 key={m.id}
                 onClick={() => handleModelChange(m.id)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
-                  activeSession.model === m.id
+                  activeModelId === m.id
                     ? "bg-cyan/10 text-cyan border border-cyan/30"
                     : "text-on-surface-variant hover:bg-white/5 border border-transparent"
                 }`}

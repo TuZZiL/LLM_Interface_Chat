@@ -14,7 +14,7 @@ export function ChatArea() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, isStreaming]);
+  }, [messages.length]);
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6">

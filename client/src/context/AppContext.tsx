@@ -24,6 +24,9 @@ interface AppState {
   sessions: SessionSummary[];
   activeSessionId: string | null;
   activeSession: Session | null;
+  draftModel: string | null;
+  draftSystemPromptId: string | null;
+  draftPromptInitialized: boolean;
   chatParams: ChatParams;
   chatStatus: ChatStatus;
   lastLatencyMs: number | null;
@@ -39,6 +42,8 @@ type Action =
   | { type: "SET_PROMPTS"; payload: Prompt[] }
   | { type: "SET_SESSIONS"; payload: SessionSummary[] }
   | { type: "SET_ACTIVE_SESSION"; payload: Session | null }
+  | { type: "SET_DRAFT_MODEL"; payload: string }
+  | { type: "SET_DRAFT_PROMPT"; payload: string | null }
   | { type: "ADD_SESSION"; payload: SessionSummary }
   | { type: "DELETE_SESSION"; payload: string }
   | { type: "SET_PARAMS"; payload: Partial<ChatParams> }
@@ -61,6 +66,9 @@ const initialState: AppState = {
   sessions: [],
   activeSessionId: null,
   activeSession: null,
+  draftModel: null,
+  draftSystemPromptId: null,
+  draftPromptInitialized: false,
   chatParams: { temperature: 1, top_p: 0.95 },
   chatStatus: "idle",
   lastLatencyMs: null,
@@ -74,9 +82,25 @@ const initialState: AppState = {
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "SET_MODELS":
-      return { ...state, models: action.payload };
+      return {
+        ...state,
+        models: action.payload,
+        draftModel:
+          state.draftModel ||
+          action.payload.find((model) => model.defaultFor === "text")?.id ||
+          action.payload[0]?.id ||
+          null,
+      };
     case "SET_PROMPTS":
-      return { ...state, prompts: action.payload };
+      return {
+        ...state,
+        prompts: action.payload,
+        draftSystemPromptId:
+          state.draftPromptInitialized
+            ? state.draftSystemPromptId
+            : action.payload.find((prompt) => prompt.isDefault)?.id ?? null,
+        draftPromptInitialized: true,
+      };
     case "SET_SESSIONS":
       return { ...state, sessions: action.payload };
     case "SET_ACTIVE_SESSION": {
@@ -101,6 +125,14 @@ function reducer(state: AppState, action: Action): AppState {
           : state.sessions,
       };
     }
+    case "SET_DRAFT_MODEL":
+      return { ...state, draftModel: action.payload };
+    case "SET_DRAFT_PROMPT":
+      return {
+        ...state,
+        draftSystemPromptId: action.payload,
+        draftPromptInitialized: true,
+      };
     case "ADD_SESSION":
       return { ...state, sessions: [action.payload, ...state.sessions] };
     case "DELETE_SESSION":
